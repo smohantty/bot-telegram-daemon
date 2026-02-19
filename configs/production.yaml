@@ -1,0 +1,24 @@
+# Bot Telegram Daemon — Production Config
+#
+# Telegram credentials are loaded from environment variables:
+#   export TELEGRAM_BOT_TOKEN="your-token-from-botfather"
+#   export TELEGRAM_CHAT_ID="your-chat-id"
+
+telegram: {}
+
+# Bot WebSocket endpoints to monitor
+bots:
+  - label: "lighter-macmini"
+    url: "ws://192.168.0.25:9001"
+
+# Reporting settings
+reporting:
+  periodic_interval_minutes: 30    # Send consolidated summary every N minutes (0 = disabled)
+  error_cooldown_seconds: 60       # Min gap between repeated error alerts per bot
+  startup_notification: true       # Send a message when the daemon starts
+
+# Connection settings
+connection:
+  reconnect_delay_seconds: 5       # Initial reconnect delay
+  max_reconnect_delay_seconds: 60  # Max reconnect delay (exponential backoff cap)
+  ping_interval_seconds: 30        # WebSocket ping interval

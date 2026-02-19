@@ -10,4 +10,3 @@ build/
 
 # Secrets
 .env
-configs/production.yaml
