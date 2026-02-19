@@ -8,5 +8,6 @@ __pycache__/
 dist/
 build/
 
-# Production config may contain secrets (bot endpoints, etc.)
+# Secrets
+.env
 configs/production.yaml

@@ -14,6 +14,8 @@ import asyncio
 import logging
 import signal
 
+from dotenv import load_dotenv
+
 from src.config import load_config
 from src.logging_utils import configure_logging
 from src.monitor import Monitor
@@ -31,6 +33,9 @@ async def main() -> None:
         help="Path to the YAML configuration file",
     )
     args = parser.parse_args()
+
+    # Load .env file (if present) so TELEGRAM_BOT_TOKEN etc. are in os.environ
+    load_dotenv()
 
     # Load config
     config = load_config(args.config_file)
