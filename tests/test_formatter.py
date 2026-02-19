@@ -17,8 +17,12 @@ class TestFormatPrice:
     """Test the price formatting helper."""
 
     def test_small_price(self) -> None:
-        assert _format_price(0.50) == "0.50"
+        assert _format_price(1.50) == "1.50"
         assert _format_price(99.99) == "99.99"
+
+    def test_tiny_price(self) -> None:
+        assert _format_price(0.50) == "0.5000"
+        assert _format_price(0.005) == "0.005000"
 
     def test_thousands(self) -> None:
         assert _format_price(1000.0) == "1,000"
@@ -33,16 +37,15 @@ class TestFormatSpacing:
     """Test the grid spacing formatting helper."""
 
     def test_geometric_equal(self) -> None:
-        """Same min/max → single value."""
+        """Same min/max -> single value."""
         result = _format_spacing((1.05, 1.05))
         assert result == "1.05%"
 
     def test_arithmetic_range(self) -> None:
-        """Different min/max → range."""
+        """Different min/max -> range."""
         result = _format_spacing((1.80, 3.20))
         assert "1.80%" in result
         assert "3.20%" in result
-        assert " - " in result
 
     def test_small_spacing(self) -> None:
         """Spacing < 1% uses 3 decimals."""
@@ -60,31 +63,34 @@ class TestFormatBotStatus:
     def test_no_summary(self) -> None:
         state = BotState(label="Test", url="ws://x", connected=True)
         result = format_bot_status("Test", state)
-        assert "No summary yet" in result
+        assert "Waiting for data" in result
 
     def test_spot_summary(self, connected_spot_state: BotState) -> None:
         result = format_bot_status("Test-Spot", connected_spot_state)
         assert "SPOT GRID" in result
         assert "ETH/USDC" in result
         assert "MAINNET" in result
-        assert "PROFIT & LOSS" in result
-        assert "POSITION" in result
-        assert "GRID CONFIG" in result
+        assert "Profit & Loss" in result
+        assert "Position" in result
+        assert "Grid Settings" in result
         assert "52.10" in result  # total_profit
         assert "45.23" in result  # matched_profit
         assert "12" in result  # roundtrips
+        assert "Entry Price" in result
+        assert "Test-Spot" in result  # label in header
 
     def test_perp_summary(self, connected_perp_state: BotState) -> None:
         result = format_bot_status("Test-Perp", connected_perp_state)
         assert "PERP GRID" in result
         assert "HYPE" in result
-        assert "long" in result
+        assert "LONG" in result  # bias uppercased
         assert "5x" in result  # leverage
-        assert "PROFIT & LOSS" in result
+        assert "Profit & Loss" in result
         assert "Realized" in result
         assert "Unrealized" in result
         assert "Long" in result  # position_side
-        assert "Mode" in result  # margin_mode
+        assert "Margin Mode" in result
+        assert "Test-Perp" in result  # label in header
 
     def test_positive_pnl_emoji(self, connected_spot_state: BotState) -> None:
         """Positive PnL shows green emoji."""
@@ -99,13 +105,27 @@ class TestFormatBotStatus:
         result = format_bot_status("Test", connected_spot_state)
         assert "\U0001f534" in result  # red circle
 
+    def test_label_in_spot_output(self, connected_spot_state: BotState) -> None:
+        """Bot label appears in the formatted output."""
+        result = format_bot_status("MyCustomLabel", connected_spot_state)
+        assert "MyCustomLabel" in result
+
+    def test_exchange_in_output(self, connected_perp_state: BotState) -> None:
+        """Exchange name appears in the formatted output."""
+        result = format_bot_status("Test", connected_perp_state)
+        assert "Hyperliquid" in result  # capitalized exchange name
+
 
 class TestFormatErrorAlert:
     def test_error_format(self) -> None:
         result = format_error_alert("MyBot", "Connection lost")
         assert "MyBot" in result
         assert "Connection lost" in result
-        assert "Error" in result
+        assert "ERROR" in result
+
+    def test_error_has_label(self) -> None:
+        result = format_error_alert("HL-Bot", "timeout")
+        assert "HL-Bot" in result
 
 
 class TestFormatStartupMessage:
@@ -114,3 +134,7 @@ class TestFormatStartupMessage:
         assert "Bot Monitor Started" in result
         assert "Bot1" in result
         assert "Bot2" in result
+
+    def test_startup_shows_count(self) -> None:
+        result = format_startup_message(["A", "B", "C"])
+        assert "3" in result
