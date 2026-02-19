@@ -14,6 +14,8 @@ from typing import Any
 from .bot_state import BotState
 from .config import DaemonConfig
 from .models import (
+    PerpGridSummary,
+    SpotGridSummary,
     parse_perp_grid_summary,
     parse_spot_grid_summary,
     parse_strategy_config,
@@ -64,7 +66,7 @@ class Monitor:
         if interval > 0:
             tasks.append(asyncio.create_task(self._periodic_report_loop()))
 
-        # Send startup notification
+        # Startup notification (lightweight — full summary sent once data arrives)
         if self._config.reporting.startup_notification:
             labels = [b.label for b in self._config.bots]
             await self._telegram.send_startup_message(labels)
@@ -95,9 +97,11 @@ class Monitor:
             elif event_type == "spot_grid_summary":
                 state.summary = parse_spot_grid_summary(data)
                 state.last_summary_at = datetime.now()
+                await self._maybe_send_initial_summary(state)
             elif event_type == "perp_grid_summary":
                 state.summary = parse_perp_grid_summary(data)
                 state.last_summary_at = datetime.now()
+                await self._maybe_send_initial_summary(state)
             elif event_type == "error":
                 error_msg = data if isinstance(data, str) else str(data)
                 state.last_error = error_msg
@@ -124,6 +128,20 @@ class Monitor:
             state.connected = False
             logger.info("Bot %s disconnected", label)
 
+    # --- Initial Summary (sent once per bot on first data) ---
+
+    async def _maybe_send_initial_summary(self, state: BotState) -> None:
+        """Send full summary when we first receive data from a bot."""
+        if state.initial_summary_sent:
+            return
+        # Need both info and summary to produce a meaningful message
+        if state.info is None or state.summary is None:
+            return
+
+        state.initial_summary_sent = True
+        state.prev_roundtrips = state.summary.roundtrips
+        await self._telegram.send_initial_summary(state.label, state)
+
     # --- Error Alerting with Cooldown ---
 
     async def _maybe_send_error_alert(
@@ -148,9 +166,13 @@ class Monitor:
     # --- Periodic Reporting ---
 
     async def _periodic_report_loop(self) -> None:
-        """Periodically send consolidated summaries."""
+        """Periodically send lightweight updates."""
         interval = self._config.reporting.periodic_interval_minutes * 60
         while True:
             await asyncio.sleep(interval)
-            logger.info("Sending periodic summary...")
-            await self._telegram.send_periodic_summary(self.bots)
+            logger.info("Sending periodic update...")
+            await self._telegram.send_periodic_update(self.bots)
+            # Snapshot roundtrips for next delta
+            for state in self.bots.values():
+                if state.summary is not None:
+                    state.prev_roundtrips = state.summary.roundtrips

@@ -15,8 +15,8 @@ from src.config import (
     ReportingConfig,
     TelegramConfig,
 )
+from src.models import PerpGridSummary, SpotGridSummary, SystemInfo
 from src.monitor import Monitor
-from src.models import SpotGridSummary, PerpGridSummary
 
 
 def _make_config(
@@ -39,16 +39,21 @@ def _make_config(
     )
 
 
+def _make_telegram_mock() -> MagicMock:
+    telegram = MagicMock()
+    telegram.send_error_alert = AsyncMock()
+    telegram.send_initial_summary = AsyncMock()
+    return telegram
+
+
 class TestEventHandling:
     """Test event routing updates BotState correctly."""
 
     @pytest.fixture
     def monitor(self) -> Monitor:
         config = _make_config()
-        telegram = MagicMock()
-        telegram.send_error_alert = AsyncMock()
+        telegram = _make_telegram_mock()
         m = Monitor(config, telegram)
-        # Pre-populate bot state
         m.bots["TestBot"] = BotState(label="TestBot", url="ws://localhost:9000")
         return m
 
@@ -130,12 +135,10 @@ class TestEventHandling:
         await monitor._handle_event("TestBot", "market_update", {"price": 100.0})
         await monitor._handle_event("TestBot", "order_update", {"oid": 1})
         await monitor._handle_event("TestBot", "grid_state", {"zones": []})
-        # No crash, state unchanged
         assert monitor.bots["TestBot"].summary is None
 
     @pytest.mark.asyncio
     async def test_unknown_label_ignored(self, monitor: Monitor) -> None:
-        """Events for unknown labels don't crash."""
         await monitor._handle_event(
             "UnknownBot", "info", {"network": "x", "exchange": "y"}
         )
@@ -150,14 +153,86 @@ class TestEventHandling:
         assert monitor.bots["TestBot"].connected is False
 
 
+class TestInitialSummary:
+    """Test that full summary is sent once on first data."""
+
+    @pytest.mark.asyncio
+    async def test_initial_summary_sent_on_first_data(self) -> None:
+        config = _make_config()
+        telegram = _make_telegram_mock()
+        monitor = Monitor(config, telegram)
+        state = BotState(label="TestBot", url="ws://x")
+        monitor.bots["TestBot"] = state
+
+        # Set info first
+        await monitor._handle_event(
+            "TestBot", "info", {"network": "mainnet", "exchange": "hyperliquid"}
+        )
+        # No summary yet — initial not sent
+        telegram.send_initial_summary.assert_not_called()
+
+        # Now send summary
+        await monitor._handle_event("TestBot", "spot_grid_summary", {
+            "symbol": "ETH", "state": "Running", "uptime": "1h",
+            "position_size": 1.0, "matched_profit": 10.0,
+            "total_profit": 12.0, "total_fees": 1.0, "grid_count": 5,
+            "range_low": 3000.0, "range_high": 4000.0,
+            "grid_spacing_pct": [1.0, 1.0], "roundtrips": 3,
+            "base_balance": 1.0, "quote_balance": 200.0,
+        })
+        telegram.send_initial_summary.assert_called_once()
+        assert state.initial_summary_sent is True
+
+    @pytest.mark.asyncio
+    async def test_initial_summary_not_repeated(self) -> None:
+        config = _make_config()
+        telegram = _make_telegram_mock()
+        monitor = Monitor(config, telegram)
+        state = BotState(label="TestBot", url="ws://x")
+        state.info = SystemInfo(network="mainnet", exchange="test")
+        monitor.bots["TestBot"] = state
+
+        data = {
+            "symbol": "ETH", "state": "Running", "uptime": "1h",
+            "position_size": 1.0, "matched_profit": 10.0,
+            "total_profit": 12.0, "total_fees": 1.0, "grid_count": 5,
+            "range_low": 3000.0, "range_high": 4000.0,
+            "grid_spacing_pct": [1.0, 1.0], "roundtrips": 3,
+            "base_balance": 1.0, "quote_balance": 200.0,
+        }
+        await monitor._handle_event("TestBot", "spot_grid_summary", data)
+        await monitor._handle_event("TestBot", "spot_grid_summary", data)
+        await monitor._handle_event("TestBot", "spot_grid_summary", data)
+        # Only sent once
+        assert telegram.send_initial_summary.call_count == 1
+
+    @pytest.mark.asyncio
+    async def test_initial_summary_snapshots_roundtrips(self) -> None:
+        config = _make_config()
+        telegram = _make_telegram_mock()
+        monitor = Monitor(config, telegram)
+        state = BotState(label="TestBot", url="ws://x")
+        state.info = SystemInfo(network="mainnet", exchange="test")
+        monitor.bots["TestBot"] = state
+
+        await monitor._handle_event("TestBot", "spot_grid_summary", {
+            "symbol": "ETH", "state": "Running", "uptime": "1h",
+            "position_size": 1.0, "matched_profit": 10.0,
+            "total_profit": 12.0, "total_fees": 1.0, "grid_count": 5,
+            "range_low": 3000.0, "range_high": 4000.0,
+            "grid_spacing_pct": [1.0, 1.0], "roundtrips": 7,
+            "base_balance": 1.0, "quote_balance": 200.0,
+        })
+        assert state.prev_roundtrips == 7
+
+
 class TestErrorCooldown:
     """Test error alert cooldown logic."""
 
     @pytest.mark.asyncio
     async def test_first_error_sends(self) -> None:
         config = _make_config(error_cooldown=60)
-        telegram = MagicMock()
-        telegram.send_error_alert = AsyncMock()
+        telegram = _make_telegram_mock()
         monitor = Monitor(config, telegram)
         monitor.bots["TestBot"] = BotState(label="TestBot", url="ws://x")
 
@@ -167,27 +242,21 @@ class TestErrorCooldown:
     @pytest.mark.asyncio
     async def test_second_error_suppressed_in_cooldown(self) -> None:
         config = _make_config(error_cooldown=60)
-        telegram = MagicMock()
-        telegram.send_error_alert = AsyncMock()
+        telegram = _make_telegram_mock()
         monitor = Monitor(config, telegram)
         monitor.bots["TestBot"] = BotState(label="TestBot", url="ws://x")
 
         await monitor._maybe_send_error_alert("TestBot", "err1")
         await monitor._maybe_send_error_alert("TestBot", "err2")
-        # Only first should have been sent
         assert telegram.send_error_alert.call_count == 1
 
     @pytest.mark.asyncio
     async def test_error_after_cooldown_sends(self) -> None:
         config = _make_config(error_cooldown=60)
-        telegram = MagicMock()
-        telegram.send_error_alert = AsyncMock()
+        telegram = _make_telegram_mock()
         monitor = Monitor(config, telegram)
         monitor.bots["TestBot"] = BotState(label="TestBot", url="ws://x")
 
-        # Simulate first error in the past
-        monitor._error_cooldowns["TestBot"] = datetime.now() - timedelta(
-            seconds=120
-        )
+        monitor._error_cooldowns["TestBot"] = datetime.now() - timedelta(seconds=120)
         await monitor._maybe_send_error_alert("TestBot", "err")
         telegram.send_error_alert.assert_called_once()

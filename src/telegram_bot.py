@@ -1,7 +1,7 @@
 """Telegram bot for command handling and message sending.
 
 Handles /status and /help commands from Telegram users, and provides
-a sender interface for the Monitor to push periodic summaries and error alerts.
+a sender interface for the Monitor to push updates.
 """
 
 from __future__ import annotations
@@ -17,6 +17,7 @@ from .config import TelegramConfig
 from .formatter import (
     format_bot_status,
     format_error_alert,
+    format_periodic_update,
     format_startup_message,
 )
 
@@ -65,7 +66,7 @@ class TelegramBot:
     async def _cmd_status(
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
     ) -> None:
-        """Handle /status command. Optionally takes a bot label argument."""
+        """Handle /status — full detailed summary."""
         if not self._monitor or not update.message:
             return
 
@@ -73,22 +74,20 @@ class TelegramBot:
         states: dict[str, BotState] = self._monitor.get_all_states()
 
         if args:
-            # /status <label> — single bot
             label = args[0]
             if label in states:
                 msg = format_bot_status(label, states[label])
             else:
                 available = ", ".join(states.keys())
-                msg = f"Unknown bot: <code>{label}</code>\nAvailable: {available}"
+                msg = f"unknown bot: {label}\navailable: {available}"
         else:
-            # /status — all bots consolidated
             if not states:
-                msg = "No bots configured."
+                msg = "no bots configured"
             else:
                 sections = [
                     format_bot_status(lbl, st) for lbl, st in states.items()
                 ]
-                msg = "\n\n" + "\u2500" * 20 + "\n\n"
+                msg = "\n\n" + "\u2500" * 24 + "\n\n"
                 msg = msg.join(sections)
 
         await self._send_safe(update.message.chat_id, msg)
@@ -101,18 +100,22 @@ class TelegramBot:
             return
 
         msg = (
-            "<b>Trading Bot Monitor</b>\n\n"
-            "/status \u2014 Status of all bots\n"
-            "/status &lt;label&gt; \u2014 Status of a specific bot\n"
-            "/help \u2014 This message"
+            "/status — full status of all bots\n"
+            "/status &lt;label&gt; — status of one bot\n"
+            "/help — this message"
         )
         await update.message.reply_text(msg, parse_mode=ParseMode.HTML)
 
     # --- Sender Interface (called by Monitor) ---
 
     async def send_startup_message(self, labels: list[str]) -> None:
-        """Send a startup notification to the configured chat."""
+        """Send lightweight startup notification."""
         msg = format_startup_message(labels)
+        await self._send_safe(self._chat_id, msg)
+
+    async def send_initial_summary(self, label: str, state: BotState) -> None:
+        """Send full summary when a bot first reports data."""
+        msg = format_bot_status(label, state)
         await self._send_safe(self._chat_id, msg)
 
     async def send_error_alert(self, label: str, error_msg: str) -> None:
@@ -120,17 +123,22 @@ class TelegramBot:
         msg = format_error_alert(label, error_msg)
         await self._send_safe(self._chat_id, msg)
 
-    async def send_periodic_summary(
+    async def send_periodic_update(
         self, bots: dict[str, BotState]
     ) -> None:
-        """Send a consolidated periodic summary of all bots."""
+        """Send lightweight periodic update — only what changed."""
         if not bots:
             return
 
-        sections = [format_bot_status(lbl, st) for lbl, st in bots.items()]
-        separator = "\n\n" + "\u2500" * 20 + "\n\n"
-        msg = separator.join(sections)
-        await self._send_safe(self._chat_id, msg)
+        sections: list[str] = []
+        for label, state in bots.items():
+            line = format_periodic_update(label, state)
+            if line is not None:
+                sections.append(line)
+
+        if sections:
+            msg = "\n".join(sections)
+            await self._send_safe(self._chat_id, msg)
 
     # --- Internal Helpers ---
 
@@ -144,7 +152,6 @@ class TelegramBot:
             except Exception as e:
                 logger.error("Failed to send Telegram message: %s", e)
         else:
-            # Split into chunks at section boundaries
             chunks = self._split_message(text)
             for chunk in chunks:
                 try:

@@ -32,3 +32,7 @@ class BotState:
     # Error tracking
     last_error: str | None = None
     last_error_at: datetime | None = None
+
+    # Periodic tracking — roundtrips at last report, for computing delta
+    prev_roundtrips: int = 0
+    initial_summary_sent: bool = False
