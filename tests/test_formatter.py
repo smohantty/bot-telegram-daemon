@@ -97,30 +97,42 @@ class TestFormatBotStatus:
 
 
 class TestFormatPeriodicUpdate:
-    """Test lightweight periodic update format."""
+    """Test lightweight periodic update with deltas."""
 
-    def test_spot_update(self, connected_spot_state: BotState) -> None:
-        connected_spot_state.prev_roundtrips = 10  # was 10, now 12
+    def test_spot_update_with_deltas(self, connected_spot_state: BotState) -> None:
+        # Simulate: prev had 10 trades, $30 matched, $2 fees
+        connected_spot_state.prev_roundtrips = 10
+        connected_spot_state.prev_matched_profit = 30.0
+        connected_spot_state.prev_total_fees = 2.0
+        # Current: 12 trades, $45.23 matched, $3.12 fees
         result = format_periodic_update("Test-Spot", connected_spot_state)
         assert result is not None
         assert "Test-Spot" in result
-        assert "ETH/USDC" in result
-        assert "+2" in result  # 12 - 10 = 2 new trades
-        assert "52.10" in result  # profit
+        assert "+2" in result  # 12 - 10
+        assert "earned" in result
+        assert "matched" in result
+        assert "fees" in result
 
-    def test_perp_update(self, connected_perp_state: BotState) -> None:
-        connected_perp_state.prev_roundtrips = 5  # was 5, now 8
+    def test_perp_update_with_deltas(self, connected_perp_state: BotState) -> None:
+        connected_perp_state.prev_roundtrips = 5
+        connected_perp_state.prev_matched_profit = 80.0
+        connected_perp_state.prev_total_fees = 5.0
+        # Current: 8 trades, $120.50 matched, $8.30 fees
         result = format_periodic_update("Test-Perp", connected_perp_state)
         assert result is not None
-        assert "Test-Perp" in result
-        assert "+3" in result  # 8 - 5 = 3 new trades
+        assert "+3" in result  # 8 - 5
         assert "long" in result
+        # net earned = (120.50-80) - (8.30-5) = 40.50 - 3.30 = 37.20
+        assert "37.20" in result
 
-    def test_no_new_trades(self, connected_spot_state: BotState) -> None:
-        connected_spot_state.prev_roundtrips = 12  # same
+    def test_no_new_trades_shows_zero(self, connected_spot_state: BotState) -> None:
+        connected_spot_state.prev_roundtrips = 12
+        connected_spot_state.prev_matched_profit = 45.23
+        connected_spot_state.prev_total_fees = 3.12
         result = format_periodic_update("Test", connected_spot_state)
         assert result is not None
         assert "+0" in result
+        assert "earned +0.00" in result
 
     def test_disconnected_shows(self, disconnected_state: BotState) -> None:
         result = format_periodic_update("Test", disconnected_state)

@@ -33,6 +33,8 @@ class BotState:
     last_error: str | None = None
     last_error_at: datetime | None = None
 
-    # Periodic tracking — roundtrips at last report, for computing delta
+    # Periodic tracking — snapshots at last report, for computing deltas
     prev_roundtrips: int = 0
+    prev_matched_profit: float = 0.0
+    prev_total_fees: float = 0.0
     initial_summary_sent: bool = False

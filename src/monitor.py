@@ -139,7 +139,7 @@ class Monitor:
             return
 
         state.initial_summary_sent = True
-        state.prev_roundtrips = state.summary.roundtrips
+        _snapshot_state(state)
         await self._telegram.send_initial_summary(state.label, state)
 
     # --- Error Alerting with Cooldown ---
@@ -172,7 +172,14 @@ class Monitor:
             await asyncio.sleep(interval)
             logger.info("Sending periodic update...")
             await self._telegram.send_periodic_update(self.bots)
-            # Snapshot roundtrips for next delta
+            # Snapshot for next delta
             for state in self.bots.values():
-                if state.summary is not None:
-                    state.prev_roundtrips = state.summary.roundtrips
+                _snapshot_state(state)
+
+
+def _snapshot_state(state: BotState) -> None:
+    """Save current values for computing deltas in the next interval."""
+    if state.summary is not None:
+        state.prev_roundtrips = state.summary.roundtrips
+        state.prev_matched_profit = state.summary.matched_profit
+        state.prev_total_fees = state.summary.total_fees

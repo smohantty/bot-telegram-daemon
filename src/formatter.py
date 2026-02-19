@@ -122,7 +122,11 @@ def _format_perp_full(label: str, state: BotState) -> str:
 
 
 def format_periodic_update(label: str, state: BotState) -> str | None:
-    """Lightweight periodic update. Returns None if nothing to report."""
+    """Lightweight periodic update showing deltas since last report.
+
+    Shows: new trades, matched profit earned, fees paid, net earned.
+    Returns None if no data yet.
+    """
     if not state.connected:
         return f"{label}  —  disconnected"
 
@@ -131,23 +135,25 @@ def format_periodic_update(label: str, state: BotState) -> str | None:
 
     s = state.summary
     new_trades = s.roundtrips - state.prev_roundtrips
+    matched_delta = s.matched_profit - state.prev_matched_profit
+    fees_delta = s.total_fees - state.prev_total_fees
+    net_earned = matched_delta - fees_delta
+
+    net_sign = "+" if net_earned >= 0 else ""
 
     if isinstance(s, SpotGridSummary):
-        pnl_sign = "+" if s.total_profit >= 0 else ""
         return (
             f"<b>{label}</b>  {s.symbol}\n"
-            f"  profit {pnl_sign}{s.total_profit:.2f}  ·  "
-            f"trades +{new_trades}  ·  "
-            f"position {s.base_balance:.4f}"
+            f"  trades +{new_trades}  ·  "
+            f"earned {net_sign}{net_earned:.2f}  "
+            f"(matched {matched_delta:+.2f}, fees {fees_delta:.2f})"
         )
     elif isinstance(s, PerpGridSummary):
-        total_pnl = s.matched_profit + s.unrealized_pnl - s.total_fees
-        pnl_sign = "+" if total_pnl >= 0 else ""
         return (
             f"<b>{label}</b>  {s.symbol} {s.grid_bias} {s.leverage}x\n"
-            f"  profit {pnl_sign}{total_pnl:.2f}  ·  "
-            f"trades +{new_trades}  ·  "
-            f"{s.position_side.lower()} {abs(s.position_size):.4f}"
+            f"  trades +{new_trades}  ·  "
+            f"earned {net_sign}{net_earned:.2f}  "
+            f"(matched {matched_delta:+.2f}, fees {fees_delta:.2f})"
         )
 
     return None

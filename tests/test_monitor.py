@@ -207,7 +207,7 @@ class TestInitialSummary:
         assert telegram.send_initial_summary.call_count == 1
 
     @pytest.mark.asyncio
-    async def test_initial_summary_snapshots_roundtrips(self) -> None:
+    async def test_initial_summary_snapshots_all_values(self) -> None:
         config = _make_config()
         telegram = _make_telegram_mock()
         monitor = Monitor(config, telegram)
@@ -218,12 +218,14 @@ class TestInitialSummary:
         await monitor._handle_event("TestBot", "spot_grid_summary", {
             "symbol": "ETH", "state": "Running", "uptime": "1h",
             "position_size": 1.0, "matched_profit": 10.0,
-            "total_profit": 12.0, "total_fees": 1.0, "grid_count": 5,
+            "total_profit": 12.0, "total_fees": 1.5, "grid_count": 5,
             "range_low": 3000.0, "range_high": 4000.0,
             "grid_spacing_pct": [1.0, 1.0], "roundtrips": 7,
             "base_balance": 1.0, "quote_balance": 200.0,
         })
         assert state.prev_roundtrips == 7
+        assert state.prev_matched_profit == 10.0
+        assert state.prev_total_fees == 1.5
 
 
 class TestErrorCooldown:
