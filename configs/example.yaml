@@ -1,0 +1,26 @@
+# Bot Telegram Daemon Configuration
+# Copy this file and fill in your values.
+
+# Telegram Bot Configuration
+telegram:
+  bot_token: "YOUR_BOT_TOKEN"   # From @BotFather
+  chat_id: "YOUR_CHAT_ID"       # Your chat/group ID
+
+# Bot WebSocket endpoints to monitor
+bots:
+  - label: "HL-HYPE-Perp"
+    url: "ws://192.168.0.25:9000"
+  - label: "Lighter-LIT-Spot"
+    url: "ws://192.168.0.25:9001"
+
+# Reporting settings
+reporting:
+  periodic_interval_minutes: 60    # Send consolidated summary every N minutes (0 = disabled)
+  error_cooldown_seconds: 60       # Min gap between repeated error alerts per bot
+  startup_notification: true       # Send a message when the daemon starts
+
+# Connection settings
+connection:
+  reconnect_delay_seconds: 5       # Initial reconnect delay
+  max_reconnect_delay_seconds: 60  # Max reconnect delay (exponential backoff cap)
+  ping_interval_seconds: 30        # WebSocket ping interval

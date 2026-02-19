@@ -1,0 +1,32 @@
+[project]
+name = "bot-telegram-daemon"
+version = "0.1.0"
+description = "Standalone Telegram monitor for trading bot WebSocket events"
+requires-python = ">=3.10"
+dependencies = [
+    "python-telegram-bot>=21.0",
+    "websockets>=15.0",
+    "pydantic>=2.0",
+    "pyyaml>=6.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "mypy>=1.0.0",
+    "types-pyyaml",
+    "ruff>=0.1.0",
+    "jsonschema>=4.0.0",
+]
+
+[tool.uv]
+package = true
+
+[tool.ruff]
+line-length = 88
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B"]
+ignore = ["E501"]
