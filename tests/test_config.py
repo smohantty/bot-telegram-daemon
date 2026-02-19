@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
+import os
 import tempfile
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 import yaml
 
-from src.config import DaemonConfig, load_config
+from src.config import DaemonConfig, TelegramConfig, load_config
 
 
 def _write_config(data: dict, path: Path) -> Path:
@@ -117,3 +119,78 @@ class TestConfigLoading:
         path = _write_config(data, tmp_path)
         with pytest.raises(Exception):
             load_config(path)
+
+
+class TestEnvVarConfig:
+    """Test environment variable support for Telegram credentials."""
+
+    def test_env_vars_override_yaml(self, tmp_path: Path) -> None:
+        """Env vars take precedence over YAML values."""
+        data = {
+            "telegram": {"bot_token": "yaml-token", "chat_id": "yaml-chat"},
+            "bots": [{"label": "B", "url": "ws://localhost:9000"}],
+        }
+        path = _write_config(data, tmp_path)
+        with patch.dict(os.environ, {
+            "TELEGRAM_BOT_TOKEN": "env-token",
+            "TELEGRAM_CHAT_ID": "env-chat",
+        }):
+            config = load_config(path)
+        assert config.telegram.bot_token == "env-token"
+        assert config.telegram.chat_id == "env-chat"
+
+    def test_env_vars_without_yaml_values(self, tmp_path: Path) -> None:
+        """Env vars work when YAML has empty telegram section."""
+        data = {
+            "telegram": {},
+            "bots": [{"label": "B", "url": "ws://localhost:9000"}],
+        }
+        path = _write_config(data, tmp_path)
+        with patch.dict(os.environ, {
+            "TELEGRAM_BOT_TOKEN": "env-token",
+            "TELEGRAM_CHAT_ID": "env-chat",
+        }):
+            config = load_config(path)
+        assert config.telegram.bot_token == "env-token"
+        assert config.telegram.chat_id == "env-chat"
+
+    def test_partial_env_var_token_only(self, tmp_path: Path) -> None:
+        """Env token overrides YAML, chat_id from YAML."""
+        data = {
+            "telegram": {"bot_token": "yaml-token", "chat_id": "yaml-chat"},
+            "bots": [{"label": "B", "url": "ws://localhost:9000"}],
+        }
+        path = _write_config(data, tmp_path)
+        with patch.dict(os.environ, {"TELEGRAM_BOT_TOKEN": "env-token"}, clear=False):
+            # Ensure TELEGRAM_CHAT_ID is not set
+            env = os.environ.copy()
+            env.pop("TELEGRAM_CHAT_ID", None)
+            with patch.dict(os.environ, env, clear=True):
+                config = load_config(path)
+        assert config.telegram.bot_token == "env-token"
+        assert config.telegram.chat_id == "yaml-chat"
+
+    def test_missing_both_raises(self, tmp_path: Path) -> None:
+        """Missing token from both env and YAML raises error."""
+        data = {
+            "telegram": {},
+            "bots": [{"label": "B", "url": "ws://localhost:9000"}],
+        }
+        path = _write_config(data, tmp_path)
+        # Ensure env vars are not set
+        env = os.environ.copy()
+        env.pop("TELEGRAM_BOT_TOKEN", None)
+        env.pop("TELEGRAM_CHAT_ID", None)
+        with patch.dict(os.environ, env, clear=True):
+            with pytest.raises(Exception, match="bot_token is required"):
+                load_config(path)
+
+    def test_telegram_config_directly_from_env(self) -> None:
+        """TelegramConfig can be created with just env vars."""
+        with patch.dict(os.environ, {
+            "TELEGRAM_BOT_TOKEN": "direct-token",
+            "TELEGRAM_CHAT_ID": "direct-chat",
+        }):
+            tc = TelegramConfig()
+        assert tc.bot_token == "direct-token"
+        assert tc.chat_id == "direct-chat"

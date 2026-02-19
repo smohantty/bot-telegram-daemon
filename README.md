@@ -59,16 +59,23 @@ You need the chat ID where the bot should send messages. This can be a private c
 
 ### 3. Configure
 
+**Set Telegram credentials via environment variables** (recommended):
+
+```bash
+export TELEGRAM_BOT_TOKEN="123456789:ABCdefGHIjklMNOpqrSTUvwxYZ"
+export TELEGRAM_CHAT_ID="-1001234567890"
+```
+
+Then create your config file:
+
 ```bash
 cp configs/example.yaml configs/production.yaml
 ```
 
-Edit `configs/production.yaml`:
+Edit `configs/production.yaml` — only the bot endpoints and reporting settings go here (no secrets):
 
 ```yaml
-telegram:
-  bot_token: "123456789:ABCdefGHIjklMNOpqrSTUvwxYZ"
-  chat_id: "-1001234567890"
+telegram: {}   # credentials come from env vars
 
 bots:
   - label: "HL-HYPE-Perp"          # Display name in Telegram messages
@@ -86,6 +93,8 @@ connection:
   max_reconnect_delay_seconds: 60
   ping_interval_seconds: 30
 ```
+
+> **Note:** Env vars always take precedence over YAML values. You can also set `bot_token` and `chat_id` directly in the YAML, but env vars keep secrets out of version control.
 
 > **Note:** The `url` can omit the `ws://` prefix — it will be added automatically.
 
@@ -125,8 +134,8 @@ uv run python main.py configs/production.yaml
 
 | Section | Field | Default | Description |
 |---------|-------|---------|-------------|
-| `telegram.bot_token` | — | *required* | Telegram bot API token from BotFather |
-| `telegram.chat_id` | — | *required* | Target chat/group ID |
+| `telegram.bot_token` | — | *required* | Telegram bot API token from BotFather (or set `TELEGRAM_BOT_TOKEN` env var) |
+| `telegram.chat_id` | — | *required* | Target chat/group ID (or set `TELEGRAM_CHAT_ID` env var) |
 | `bots[].label` | — | *required* | Human-readable name shown in messages |
 | `bots[].url` | — | *required* | WebSocket URL of the bot |
 | `reporting.periodic_interval_minutes` | 60 | | Consolidated summary interval (0 = disabled) |

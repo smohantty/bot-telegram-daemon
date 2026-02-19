@@ -1,10 +1,17 @@
 # Bot Telegram Daemon Configuration
-# Copy this file and fill in your values.
+#
+# Telegram credentials are loaded from environment variables (recommended):
+#   export TELEGRAM_BOT_TOKEN="123456789:ABCdefGHIjklMNOpqrSTUvwxYZ"
+#   export TELEGRAM_CHAT_ID="-1001234567890"
+#
+# You can also set them directly in this file (not recommended for production):
+#   telegram:
+#     bot_token: "123456789:ABCdefGHIjklMNOpqrSTUvwxYZ"
+#     chat_id: "-1001234567890"
+#
+# Env vars always take precedence over YAML values.
 
-# Telegram Bot Configuration
-telegram:
-  bot_token: "YOUR_BOT_TOKEN"   # From @BotFather
-  chat_id: "YOUR_CHAT_ID"       # Your chat/group ID
+telegram: {}
 
 # Bot WebSocket endpoints to monitor
 bots:

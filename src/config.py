@@ -1,14 +1,47 @@
-"""Configuration models and YAML loader."""
+"""Configuration models and YAML loader.
 
+Telegram credentials (bot_token, chat_id) can be provided via environment
+variables ``TELEGRAM_BOT_TOKEN`` and ``TELEGRAM_CHAT_ID``.  Values in the
+YAML file are used as fallback — env vars always take precedence.
+"""
+
+import os
 from pathlib import Path
 
 import yaml
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, model_validator
 
 
 class TelegramConfig(BaseModel):
-    bot_token: str
-    chat_id: str
+    bot_token: str = ""
+    chat_id: str = ""
+
+    @model_validator(mode="before")
+    @classmethod
+    def _resolve_env_vars(cls, values: dict) -> dict:  # type: ignore[override]
+        """Override token / chat_id from env vars if set."""
+        env_token = os.environ.get("TELEGRAM_BOT_TOKEN")
+        env_chat = os.environ.get("TELEGRAM_CHAT_ID")
+        if env_token:
+            values["bot_token"] = env_token
+        if env_chat:
+            values["chat_id"] = env_chat
+        return values
+
+    @model_validator(mode="after")
+    def _check_required(self) -> "TelegramConfig":
+        """Ensure both fields are present (from YAML or env)."""
+        if not self.bot_token:
+            raise ValueError(
+                "bot_token is required — set TELEGRAM_BOT_TOKEN env var "
+                "or provide it in the YAML config"
+            )
+        if not self.chat_id:
+            raise ValueError(
+                "chat_id is required — set TELEGRAM_CHAT_ID env var "
+                "or provide it in the YAML config"
+            )
+        return self
 
 
 class BotEndpoint(BaseModel):

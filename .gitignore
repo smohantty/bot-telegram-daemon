@@ -7,3 +7,6 @@ __pycache__/
 .ruff_cache/
 dist/
 build/
+
+# Production config may contain secrets (bot endpoints, etc.)
+configs/production.yaml
