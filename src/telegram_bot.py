@@ -14,7 +14,7 @@ from telegram import Update
 from telegram.constants import ParseMode
 from telegram.ext import Application, CommandHandler, ContextTypes
 
-from .card_renderer import build_card_from_state
+from .card_renderer import build_card_from_state, build_periodic_card
 from .config import TelegramConfig
 from .formatter import (
     format_bot_status,
@@ -145,7 +145,7 @@ class TelegramBot:
             return  # no data yet, skip
 
         try:
-            image_buf = build_card_from_state(label, state)
+            image_buf = build_periodic_card(label, state)
             await self._send_photo(self._chat_id, image_buf)
         except Exception as e:
             logger.warning("Card render failed for %s: %s — falling back to text", label, e)

@@ -9,7 +9,7 @@ import pytest
 from PIL import Image
 
 from src.bot_state import BotState
-from src.card_renderer import CARD_H, CARD_W, build_card_from_state
+from src.card_renderer import CARD_H, CARD_W, _PC_H, _PC_W, build_card_from_state, build_periodic_card
 
 
 class TestCardRendererSmoke:
@@ -79,3 +79,52 @@ class TestCardRendererSmoke:
             out_path = tmp_path / f"card_{label}.png"
             out_path.write_bytes(buf.read())
             print(f"Saved {label} card to {out_path}")
+
+
+class TestPeriodicCardSmoke:
+    def test_spot_periodic_card_returns_bytesio(self, connected_spot_state: BotState) -> None:
+        buf = build_periodic_card("Test-Spot", connected_spot_state)
+        assert isinstance(buf, io.BytesIO)
+        assert buf.tell() == 0
+        assert len(buf.read()) > 1_000
+
+    def test_perp_periodic_card_returns_bytesio(self, connected_perp_state: BotState) -> None:
+        buf = build_periodic_card("Test-Perp", connected_perp_state)
+        assert isinstance(buf, io.BytesIO)
+        assert buf.tell() == 0
+        assert len(buf.read()) > 1_000
+
+    def test_periodic_card_dimensions(self, connected_spot_state: BotState) -> None:
+        buf = build_periodic_card("Test-Spot", connected_spot_state)
+        img = Image.open(buf)
+        assert img.size == (_PC_W, _PC_H)
+        assert img.mode == "RGB"
+
+    def test_periodic_card_with_deltas(self, connected_spot_state: BotState) -> None:
+        connected_spot_state.prev_roundtrips = 10
+        connected_spot_state.prev_matched_profit = 30.0
+        connected_spot_state.prev_total_fees = 1.5
+        buf = build_periodic_card("Delta-Spot", connected_spot_state)
+        img = Image.open(buf)
+        assert img.size == (_PC_W, _PC_H)
+
+    def test_periodic_card_raises_on_no_summary(self) -> None:
+        state = BotState(label="X", url="ws://x", connected=True)
+        with pytest.raises(ValueError, match="No summary data"):
+            build_periodic_card("X", state)
+
+    def test_saves_periodic_card_when_requested(
+        self, connected_spot_state: BotState, connected_perp_state: BotState, tmp_path
+    ) -> None:
+        """Visual inspection: set SAVE_TEST_CARDS=1 to write PNGs."""
+        if not os.environ.get("SAVE_TEST_CARDS"):
+            pytest.skip("Set SAVE_TEST_CARDS=1 to enable visual output")
+
+        for label, state in [("spot", connected_spot_state), ("perp", connected_perp_state)]:
+            state.prev_roundtrips = 5
+            state.prev_matched_profit = 20.0
+            state.prev_total_fees = 1.0
+            buf = build_periodic_card(f"Periodic-{label.upper()}", state)
+            out_path = tmp_path / f"periodic_{label}.png"
+            out_path.write_bytes(buf.read())
+            print(f"Saved periodic {label} card to {out_path}")

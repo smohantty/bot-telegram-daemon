@@ -1,8 +1,8 @@
-"""Report card image generator for periodic Telegram updates.
+"""Report card image generator for Telegram updates.
 
-Generates a 800×480 PNG with a modern dark-theme layout showing
-trading bot PnL and summary metrics, matching the bot-dashboard
-colour scheme.
+Provides two card styles:
+- Full detail card (dark theme, 800×480) for on-demand /status
+- Compact periodic card (light theme, 600×280) highlighting trades & profit
 """
 
 from __future__ import annotations
@@ -637,6 +637,178 @@ def build_card_from_state(label: str, state: "BotState") -> io.BytesIO:
         )
     else:
         raise ValueError(f"Unknown summary type for {label!r}: {type(state.summary)}")
+
+    buf = io.BytesIO()
+    img.save(buf, format="PNG", optimize=True)
+    buf.seek(0)
+    return buf
+
+
+# ---------------------------------------------------------------------------
+# Compact periodic card — Binance PnL-share inspired, light theme
+# ---------------------------------------------------------------------------
+
+# Light-theme palette
+_L_BG        = (255, 255, 255)
+_L_BG_SUB    = (247, 248, 250)
+_L_BORDER    = (226, 232, 240)
+_L_TEXT_PRI  = (15,  23,  42)
+_L_TEXT_SEC  = (100, 116, 139)
+_L_TEXT_MUT  = (148, 163, 184)
+_L_GREEN     = (14,  203, 129)   # Binance green
+_L_GREEN_DK  = (10,  160, 100)   # darker for text on white
+_L_GREEN_BG  = (230, 252, 240)
+_L_RED       = (246, 70,  93)    # Binance red
+_L_RED_BG    = (254, 232, 235)
+
+_PC_W = 600
+_PC_H = 340
+
+
+def _lp_color(value: float) -> tuple:
+    return _L_GREEN_DK if value >= 0 else _L_RED
+
+
+def _lp_accent(value: float) -> tuple:
+    return _L_GREEN if value >= 0 else _L_RED
+
+
+def _lp_bg(value: float) -> tuple:
+    return _L_GREEN_BG if value >= 0 else _L_RED_BG
+
+
+def _load_large_font(size: int) -> ImageFont.FreeTypeFont:
+    """Load a large bold font for the hero PnL number."""
+    bold_paths = [_UBUNTU_DIR + "Ubuntu-B.ttf", _DEJAVU_DIR + "DejaVuSans-Bold.ttf"]
+    return _load_any(bold_paths, size)
+
+
+def _render_periodic_card(
+    label: str,
+    symbol: str,
+    strategy_type: str,
+    total_profit: float,
+    roundtrips: int,
+    delta_roundtrips: int,
+    delta_profit: float,
+    uptime: str,
+) -> Image.Image:
+    img = Image.new("RGB", (_PC_W, _PC_H), _L_BG)
+    draw = ImageDraw.Draw(img)
+    f = _fonts()
+    hero_font = _load_large_font(52)
+
+    accent = _lp_accent(total_profit)
+
+    # ── Left accent stripe (Binance-style colored edge) ──
+    draw.rectangle([(0, 0), (5, _PC_H)], fill=accent)
+
+    # ── Header: symbol + strategy badge ──
+    hdr_y = 24
+    _text(draw, 28, hdr_y, symbol, f["b22"], _L_TEXT_PRI)
+    sym_w = _tw(draw, symbol, f["b22"])
+    badge_x = 28 + sym_w + 12
+    badge_y = hdr_y + 2
+    badge_color = _L_GREEN_DK if strategy_type.startswith("Spot") else (180, 130, 20)
+    badge_bg = _L_GREEN_BG if strategy_type.startswith("Spot") else (255, 243, 210)
+    _badge(draw, badge_x, badge_y, strategy_type.upper(), badge_color, badge_bg, f["b11"])
+
+    # Label — right side
+    _text_right(draw, _PC_W - 28, hdr_y + 4, label, f["r13"], _L_TEXT_MUT)
+
+    # ── Hero PnL — big centered number ──
+    pnl_str = _signed(total_profit)
+    pnl_color = _lp_color(total_profit)
+
+    # Center the PnL horizontally
+    pnl_w = _tw(draw, pnl_str, hero_font)
+    pnl_x = (_PC_W - pnl_w) // 2
+    pnl_y = 80
+    _text(draw, pnl_x, pnl_y, pnl_str, hero_font, pnl_color)
+
+    # "Total Profit" label above (centered)
+    _text_centered(draw, _PC_W // 2, pnl_y - 22, "TOTAL PROFIT", f["r12"], _L_TEXT_MUT)
+
+    # ── Delta pill below the hero number ──
+    pill_y = pnl_y + 64
+    delta_str = f"{_signed(delta_profit)} this period"
+    pill_color = _lp_color(delta_profit)
+    pill_bg = _lp_bg(delta_profit)
+    # Center the pill
+    pill_w = _tw(draw, delta_str, f["r12"]) + 20
+    pill_x = (_PC_W - pill_w) // 2
+    _badge(draw, pill_x, pill_y, delta_str, pill_color, pill_bg, f["r12"], h_pad=10, v_pad=5)
+
+    # ── Divider ──
+    div_y = pill_y + 40
+    draw.line([(28, div_y), (_PC_W - 28, div_y)], fill=_L_BORDER, width=1)
+
+    # ── Matched Trades row ──
+    trades_y = div_y + 18
+    _text(draw, 28, trades_y, "Matched Trades", f["r14"], _L_TEXT_SEC)
+    trades_str = str(roundtrips)
+    _text_right(draw, _PC_W - 28, trades_y, trades_str, f["b18"], _L_TEXT_PRI)
+
+    # Delta trades
+    if delta_roundtrips > 0:
+        dt_str = f"+{delta_roundtrips} new"
+        dt_w = _tw(draw, trades_str, f["b18"])
+        _text_right(draw, _PC_W - 28 - dt_w - 12, trades_y + 2, dt_str, f["r12"], _L_GREEN_DK)
+
+    # ── Uptime row ──
+    uptime_y = trades_y + 34
+    _text(draw, 28, uptime_y, "Uptime", f["r14"], _L_TEXT_SEC)
+    _text_right(draw, _PC_W - 28, uptime_y, uptime, f["b15"], _L_TEXT_PRI)
+
+    # ── Footer bar ──
+    foot_y = _PC_H - 36
+    draw.line([(28, foot_y), (_PC_W - 28, foot_y)], fill=_L_BORDER, width=1)
+
+    # Status dot + timestamp
+    dot_cx = 38
+    dot_cy = foot_y + 18
+    draw.ellipse([(dot_cx - 4, dot_cy - 4), (dot_cx + 4, dot_cy + 4)], fill=_L_GREEN)
+    _text(draw, dot_cx + 12, foot_y + 11, "LIVE", f["b11"], _L_GREEN_DK)
+
+    ts = datetime.now().strftime("%H:%M · %b %d")
+    _text_right(draw, _PC_W - 28, foot_y + 11, ts, f["r12"], _L_TEXT_MUT)
+
+    return img
+
+
+def build_periodic_card(label: str, state: "BotState") -> io.BytesIO:
+    """Generate a compact periodic PNG card focused on trades & profit.
+
+    Returns BytesIO seeked to 0. Raises ValueError if state.summary is None.
+    """
+    from .models import PerpGridSummary, SpotGridSummary
+
+    if state.summary is None:
+        raise ValueError(f"No summary data available for {label!r}")
+
+    delta_roundtrips = state.summary.roundtrips - state.prev_roundtrips
+    delta_profit = (
+        (state.summary.matched_profit - state.prev_matched_profit)
+        - (state.summary.total_fees - state.prev_total_fees)
+    )
+
+    if isinstance(state.summary, SpotGridSummary):
+        stype = "Spot Grid"
+    elif isinstance(state.summary, PerpGridSummary):
+        stype = "Perp Grid"
+    else:
+        stype = "Grid"
+
+    img = _render_periodic_card(
+        label=label,
+        symbol=state.summary.symbol,
+        strategy_type=stype,
+        total_profit=state.summary.total_profit,
+        roundtrips=state.summary.roundtrips,
+        delta_roundtrips=delta_roundtrips,
+        delta_profit=delta_profit,
+        uptime=state.summary.uptime,
+    )
 
     buf = io.BytesIO()
     img.save(buf, format="PNG", optimize=True)
