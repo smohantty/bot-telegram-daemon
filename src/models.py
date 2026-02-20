@@ -36,8 +36,8 @@ class SpotGridSummary:
 
     # Grid metrics
     grid_count: int
-    range_low: float
-    range_high: float
+    grid_range_low: float
+    grid_range_high: float
     grid_spacing_pct: tuple[float, float]  # (min%, max%)
     roundtrips: int
 
@@ -70,8 +70,8 @@ class PerpGridSummary:
     leverage: int
     grid_bias: str  # "long", "short", "neutral"
     grid_count: int
-    range_low: float
-    range_high: float
+    grid_range_low: float
+    grid_range_high: float
     grid_spacing_pct: tuple[float, float]
     roundtrips: int
 
@@ -122,8 +122,8 @@ def parse_spot_grid_summary(data: dict) -> SpotGridSummary:
         total_profit=data["total_profit"],
         total_fees=data["total_fees"],
         grid_count=data["grid_count"],
-        range_low=data["range_low"],
-        range_high=data["range_high"],
+        grid_range_low=data["grid_range_low"],
+        grid_range_high=data["grid_range_high"],
         grid_spacing_pct=(spacing[0], spacing[1]),
         roundtrips=data["roundtrips"],
         base_balance=data["base_balance"],
@@ -147,8 +147,8 @@ def parse_perp_grid_summary(data: dict) -> PerpGridSummary:
         leverage=data["leverage"],
         grid_bias=data["grid_bias"],
         grid_count=data["grid_count"],
-        range_low=data["range_low"],
-        range_high=data["range_high"],
+        grid_range_low=data["grid_range_low"],
+        grid_range_high=data["grid_range_high"],
         grid_spacing_pct=(spacing[0], spacing[1]),
         roundtrips=data["roundtrips"],
         margin_balance=data["margin_balance"],
