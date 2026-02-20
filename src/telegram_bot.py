@@ -6,6 +6,7 @@ a sender interface for the Monitor to push updates.
 
 from __future__ import annotations
 
+import io
 import logging
 from typing import TYPE_CHECKING
 
@@ -13,6 +14,7 @@ from telegram import Update
 from telegram.constants import ParseMode
 from telegram.ext import Application, CommandHandler, ContextTypes
 
+from .card_renderer import build_card_from_state
 from .config import TelegramConfig
 from .formatter import (
     format_bot_status,
@@ -126,19 +128,37 @@ class TelegramBot:
     async def send_periodic_update(
         self, bots: dict[str, BotState]
     ) -> None:
-        """Send lightweight periodic update — only what changed."""
+        """Send periodic update as a PNG report card image per bot."""
         if not bots:
             return
 
-        sections: list[str] = []
         for label, state in bots.items():
-            line = format_periodic_update(label, state)
-            if line is not None:
-                sections.append(line)
+            await self._send_periodic_card(label, state)
 
-        if sections:
-            msg = "\n".join(sections)
-            await self._send_safe(self._chat_id, msg)
+    async def _send_periodic_card(self, label: str, state: "BotState") -> None:
+        """Send one bot's periodic update as an image card with text fallback."""
+        if not state.connected:
+            await self._send_safe(self._chat_id, f"{label} — disconnected")
+            return
+
+        if state.summary is None:
+            return  # no data yet, skip
+
+        try:
+            image_buf = build_card_from_state(label, state)
+            await self._send_photo(self._chat_id, image_buf)
+        except Exception as e:
+            logger.warning("Card render failed for %s: %s — falling back to text", label, e)
+            fallback = format_periodic_update(label, state)
+            if fallback:
+                await self._send_safe(self._chat_id, fallback)
+
+    async def _send_photo(self, chat_id: int, image_buf: io.BytesIO) -> None:
+        """Send a PNG image to a Telegram chat."""
+        try:
+            await self._app.bot.send_photo(chat_id=chat_id, photo=image_buf)
+        except Exception as e:
+            logger.error("Failed to send Telegram photo: %s", e)
 
     # --- Internal Helpers ---
 
