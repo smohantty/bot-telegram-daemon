@@ -650,19 +650,18 @@ def build_card_from_state(label: str, state: "BotState") -> io.BytesIO:
 
 # Light-theme palette
 _L_BG        = (255, 255, 255)
-_L_BG_SUB    = (247, 248, 250)
-_L_BORDER    = (226, 232, 240)
+_L_BORDER    = (230, 234, 240)
 _L_TEXT_PRI  = (15,  23,  42)
-_L_TEXT_SEC  = (100, 116, 139)
-_L_TEXT_MUT  = (148, 163, 184)
+_L_TEXT_SEC  = (80,  95,  116)
+_L_TEXT_MUT  = (140, 155, 175)
 _L_GREEN     = (14,  203, 129)   # Binance green
 _L_GREEN_DK  = (10,  160, 100)   # darker for text on white
-_L_GREEN_BG  = (230, 252, 240)
+_L_GREEN_BG  = (225, 250, 237)
 _L_RED       = (246, 70,  93)    # Binance red
-_L_RED_BG    = (254, 232, 235)
+_L_RED_BG    = (254, 230, 234)
 
-_PC_W = 600
-_PC_H = 340
+_PC_W = 420
+_PC_H = 240
 
 
 def _lp_color(value: float) -> tuple:
@@ -677,10 +676,28 @@ def _lp_bg(value: float) -> tuple:
     return _L_GREEN_BG if value >= 0 else _L_RED_BG
 
 
-def _load_large_font(size: int) -> ImageFont.FreeTypeFont:
-    """Load a large bold font for the hero PnL number."""
+_PERIODIC_FONT_CACHE: dict | None = None
+
+
+def _periodic_fonts() -> dict:
+    """Larger fonts for the compact card so text reads well on mobile."""
+    global _PERIODIC_FONT_CACHE
+    if _PERIODIC_FONT_CACHE:
+        return _PERIODIC_FONT_CACHE
+
     bold_paths = [_UBUNTU_DIR + "Ubuntu-B.ttf", _DEJAVU_DIR + "DejaVuSans-Bold.ttf"]
-    return _load_any(bold_paths, size)
+    reg_paths  = [_UBUNTU_DIR + "Ubuntu-R.ttf", _DEJAVU_DIR + "DejaVuSans.ttf"]
+
+    _PERIODIC_FONT_CACHE = {
+        "hero":  _load_any(bold_paths, 48),
+        "b20":   _load_any(bold_paths, 20),
+        "b16":   _load_any(bold_paths, 16),
+        "b13":   _load_any(bold_paths, 13),
+        "r16":   _load_any(reg_paths,  16),
+        "r14":   _load_any(reg_paths,  14),
+        "r13":   _load_any(reg_paths,  13),
+    }
+    return _PERIODIC_FONT_CACHE
 
 
 def _render_periodic_card(
@@ -695,83 +712,67 @@ def _render_periodic_card(
 ) -> Image.Image:
     img = Image.new("RGB", (_PC_W, _PC_H), _L_BG)
     draw = ImageDraw.Draw(img)
-    f = _fonts()
-    hero_font = _load_large_font(52)
+    pf = _periodic_fonts()
+    pad = 20
 
     accent = _lp_accent(total_profit)
-
-    # ── Left accent stripe (Binance-style colored edge) ──
-    draw.rectangle([(0, 0), (5, _PC_H)], fill=accent)
-
-    # ── Header: symbol + strategy badge ──
-    hdr_y = 24
-    _text(draw, 28, hdr_y, symbol, f["b22"], _L_TEXT_PRI)
-    sym_w = _tw(draw, symbol, f["b22"])
-    badge_x = 28 + sym_w + 12
-    badge_y = hdr_y + 2
-    badge_color = _L_GREEN_DK if strategy_type.startswith("Spot") else (180, 130, 20)
-    badge_bg = _L_GREEN_BG if strategy_type.startswith("Spot") else (255, 243, 210)
-    _badge(draw, badge_x, badge_y, strategy_type.upper(), badge_color, badge_bg, f["b11"])
-
-    # Label — right side
-    _text_right(draw, _PC_W - 28, hdr_y + 4, label, f["r13"], _L_TEXT_MUT)
-
-    # ── Hero PnL — big centered number ──
-    pnl_str = _signed(total_profit)
     pnl_color = _lp_color(total_profit)
 
-    # Center the PnL horizontally
-    pnl_w = _tw(draw, pnl_str, hero_font)
-    pnl_x = (_PC_W - pnl_w) // 2
-    pnl_y = 80
-    _text(draw, pnl_x, pnl_y, pnl_str, hero_font, pnl_color)
+    # ── Top accent bar ──
+    draw.rectangle([(0, 0), (_PC_W, 4)], fill=accent)
 
-    # "Total Profit" label above (centered)
-    _text_centered(draw, _PC_W // 2, pnl_y - 22, "TOTAL PROFIT", f["r12"], _L_TEXT_MUT)
+    # ── Row 1: symbol + badge + label ──
+    y = 14
+    _text(draw, pad, y, symbol, pf["b20"], _L_TEXT_PRI)
+    sym_w = _tw(draw, symbol, pf["b20"])
+    badge_color = _L_GREEN_DK if strategy_type.startswith("Spot") else (180, 130, 20)
+    badge_bg = _L_GREEN_BG if strategy_type.startswith("Spot") else (255, 243, 210)
+    _badge(draw, pad + sym_w + 8, y + 2, strategy_type.upper(), badge_color, badge_bg, pf["b13"])
+    _text_right(draw, _PC_W - pad, y + 3, label, pf["r13"], _L_TEXT_MUT)
 
-    # ── Delta pill below the hero number ──
-    pill_y = pnl_y + 64
+    # ── Hero PnL ──
+    pnl_str = _signed(total_profit)
+    pnl_y = 48
+    _text_centered(draw, _PC_W // 2, pnl_y, pnl_str, pf["hero"], pnl_color)
+
+    # ── Delta pill ──
     delta_str = f"{_signed(delta_profit)} this period"
     pill_color = _lp_color(delta_profit)
     pill_bg = _lp_bg(delta_profit)
-    # Center the pill
-    pill_w = _tw(draw, delta_str, f["r12"]) + 20
+    pill_w = _tw(draw, delta_str, pf["r13"]) + 20
     pill_x = (_PC_W - pill_w) // 2
-    _badge(draw, pill_x, pill_y, delta_str, pill_color, pill_bg, f["r12"], h_pad=10, v_pad=5)
+    pill_y = 104
+    _badge(draw, pill_x, pill_y, delta_str, pill_color, pill_bg, pf["r13"], h_pad=10, v_pad=4)
 
     # ── Divider ──
-    div_y = pill_y + 40
-    draw.line([(28, div_y), (_PC_W - 28, div_y)], fill=_L_BORDER, width=1)
+    div_y = 134
+    draw.line([(pad, div_y), (_PC_W - pad, div_y)], fill=_L_BORDER, width=1)
 
     # ── Matched Trades row ──
-    trades_y = div_y + 18
-    _text(draw, 28, trades_y, "Matched Trades", f["r14"], _L_TEXT_SEC)
+    row_y = 146
+    _text(draw, pad, row_y, "Matched Trades", pf["r16"], _L_TEXT_SEC)
     trades_str = str(roundtrips)
-    _text_right(draw, _PC_W - 28, trades_y, trades_str, f["b18"], _L_TEXT_PRI)
-
-    # Delta trades
+    _text_right(draw, _PC_W - pad, row_y, trades_str, pf["b20"], _L_TEXT_PRI)
     if delta_roundtrips > 0:
-        dt_str = f"+{delta_roundtrips} new"
-        dt_w = _tw(draw, trades_str, f["b18"])
-        _text_right(draw, _PC_W - 28 - dt_w - 12, trades_y + 2, dt_str, f["r12"], _L_GREEN_DK)
+        dt_str = f"+{delta_roundtrips}"
+        dt_w = _tw(draw, trades_str, pf["b20"])
+        _text_right(draw, _PC_W - pad - dt_w - 10, row_y + 2, dt_str, pf["r14"], _L_GREEN_DK)
 
     # ── Uptime row ──
-    uptime_y = trades_y + 34
-    _text(draw, 28, uptime_y, "Uptime", f["r14"], _L_TEXT_SEC)
-    _text_right(draw, _PC_W - 28, uptime_y, uptime, f["b15"], _L_TEXT_PRI)
+    row2_y = 176
+    _text(draw, pad, row2_y, "Uptime", pf["r16"], _L_TEXT_SEC)
+    _text_right(draw, _PC_W - pad, row2_y, uptime, pf["b16"], _L_TEXT_PRI)
 
-    # ── Footer bar ──
-    foot_y = _PC_H - 36
-    draw.line([(28, foot_y), (_PC_W - 28, foot_y)], fill=_L_BORDER, width=1)
-
-    # Status dot + timestamp
-    dot_cx = 38
-    dot_cy = foot_y + 18
+    # ── Footer ──
+    foot_y = 210
+    draw.line([(pad, foot_y), (_PC_W - pad, foot_y)], fill=_L_BORDER, width=1)
+    fy = foot_y + 9
+    dot_cx = pad + 6
+    dot_cy = fy + 6
     draw.ellipse([(dot_cx - 4, dot_cy - 4), (dot_cx + 4, dot_cy + 4)], fill=_L_GREEN)
-    _text(draw, dot_cx + 12, foot_y + 11, "LIVE", f["b11"], _L_GREEN_DK)
-
+    _text(draw, dot_cx + 10, fy, "LIVE", pf["b13"], _L_GREEN_DK)
     ts = datetime.now().strftime("%H:%M · %b %d")
-    _text_right(draw, _PC_W - 28, foot_y + 11, ts, f["r12"], _L_TEXT_MUT)
+    _text_right(draw, _PC_W - pad, fy, ts, pf["r13"], _L_TEXT_MUT)
 
     return img
 
