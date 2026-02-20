@@ -70,8 +70,12 @@ _H_FOOTER = CARD_H - _Y_FOOTER   # remaining space (~37px)
 # ---------------------------------------------------------------------------
 # Font management
 # ---------------------------------------------------------------------------
+# Linux font dirs
 _UBUNTU_DIR = "/usr/share/fonts/truetype/ubuntu/"
 _DEJAVU_DIR = "/usr/share/fonts/truetype/dejavu/"
+# macOS font dirs
+_MAC_SUPP_DIR = "/System/Library/Fonts/Supplemental/"
+_MAC_SYS_DIR  = "/System/Library/Fonts/"
 
 _FONT_CACHE: dict | None = None
 
@@ -96,9 +100,18 @@ def _fonts() -> dict:
     if _FONT_CACHE:
         return _FONT_CACHE
 
-    bold_paths = [_UBUNTU_DIR + "Ubuntu-B.ttf",     _DEJAVU_DIR + "DejaVuSans-Bold.ttf"]
-    reg_paths  = [_UBUNTU_DIR + "Ubuntu-R.ttf",     _DEJAVU_DIR + "DejaVuSans.ttf"]
-    mono_paths = [_UBUNTU_DIR + "UbuntuMono-R.ttf", _DEJAVU_DIR + "DejaVuSansMono.ttf"]
+    bold_paths = [
+        _UBUNTU_DIR + "Ubuntu-B.ttf", _DEJAVU_DIR + "DejaVuSans-Bold.ttf",
+        _MAC_SUPP_DIR + "Arial Bold.ttf", _MAC_SYS_DIR + "Helvetica.ttc",
+    ]
+    reg_paths = [
+        _UBUNTU_DIR + "Ubuntu-R.ttf", _DEJAVU_DIR + "DejaVuSans.ttf",
+        _MAC_SUPP_DIR + "Arial.ttf", _MAC_SYS_DIR + "Helvetica.ttc",
+    ]
+    mono_paths = [
+        _UBUNTU_DIR + "UbuntuMono-R.ttf", _DEJAVU_DIR + "DejaVuSansMono.ttf",
+        _MAC_SUPP_DIR + "Courier New.ttf",
+    ]
 
     _FONT_CACHE = {
         "b11": _load_any(bold_paths, 11),
@@ -645,57 +658,52 @@ def build_card_from_state(label: str, state: "BotState") -> io.BytesIO:
 
 
 # ---------------------------------------------------------------------------
-# Compact periodic card — Binance PnL-share inspired, light theme
+# Compact periodic card — Binance PnL-share style, dark theme
 # ---------------------------------------------------------------------------
 
-# Light-theme palette
-_L_BG        = (255, 255, 255)
-_L_BORDER    = (230, 234, 240)
-_L_TEXT_PRI  = (15,  23,  42)
-_L_TEXT_SEC  = (80,  95,  116)
-_L_TEXT_MUT  = (140, 155, 175)
-_L_GREEN     = (14,  203, 129)   # Binance green
-_L_GREEN_DK  = (10,  160, 100)   # darker for text on white
-_L_GREEN_BG  = (225, 250, 237)
-_L_RED       = (246, 70,  93)    # Binance red
-_L_RED_BG    = (254, 230, 234)
+# Binance-style dark palette
+_P_BG        = (24, 26, 32)       # slightly lighter than pure black for Telegram visibility
+_P_CARD_EDGE = (40, 44, 52)       # subtle card border
+_P_DIVIDER   = (40, 44, 52)
+_P_WHITE     = (234, 236, 239)
+_P_GREY      = (148, 158, 172)    # labels — brighter for readability
+_P_GREEN     = (14,  203, 129)    # Binance green
+_P_RED       = (246, 70,  93)     # Binance red
 
-_PC_W = 420
-_PC_H = 240
+# Large canvas so fonts stay readable after Telegram scaling
+_PC_W = 1080
+_PC_H = 580
 
 
 def _lp_color(value: float) -> tuple:
-    return _L_GREEN_DK if value >= 0 else _L_RED
-
-
-def _lp_accent(value: float) -> tuple:
-    return _L_GREEN if value >= 0 else _L_RED
-
-
-def _lp_bg(value: float) -> tuple:
-    return _L_GREEN_BG if value >= 0 else _L_RED_BG
+    return _P_GREEN if value >= 0 else _P_RED
 
 
 _PERIODIC_FONT_CACHE: dict | None = None
 
 
 def _periodic_fonts() -> dict:
-    """Larger fonts for the compact card so text reads well on mobile."""
     global _PERIODIC_FONT_CACHE
     if _PERIODIC_FONT_CACHE:
         return _PERIODIC_FONT_CACHE
 
-    bold_paths = [_UBUNTU_DIR + "Ubuntu-B.ttf", _DEJAVU_DIR + "DejaVuSans-Bold.ttf"]
-    reg_paths  = [_UBUNTU_DIR + "Ubuntu-R.ttf", _DEJAVU_DIR + "DejaVuSans.ttf"]
+    bold_paths = [
+        _UBUNTU_DIR + "Ubuntu-B.ttf", _DEJAVU_DIR + "DejaVuSans-Bold.ttf",
+        _MAC_SUPP_DIR + "Arial Bold.ttf", _MAC_SYS_DIR + "Helvetica.ttc",
+    ]
+    reg_paths = [
+        _UBUNTU_DIR + "Ubuntu-R.ttf", _DEJAVU_DIR + "DejaVuSans.ttf",
+        _MAC_SUPP_DIR + "Arial.ttf", _MAC_SYS_DIR + "Helvetica.ttc",
+    ]
 
     _PERIODIC_FONT_CACHE = {
-        "hero":  _load_any(bold_paths, 48),
-        "b20":   _load_any(bold_paths, 20),
-        "b16":   _load_any(bold_paths, 16),
-        "b13":   _load_any(bold_paths, 13),
-        "r16":   _load_any(reg_paths,  16),
-        "r14":   _load_any(reg_paths,  14),
-        "r13":   _load_any(reg_paths,  13),
+        "hero":  _load_any(bold_paths, 128),
+        "b48":   _load_any(bold_paths, 48),
+        "b40":   _load_any(bold_paths, 40),
+        "b30":   _load_any(bold_paths, 30),
+        "r34":   _load_any(reg_paths,  34),
+        "r28":   _load_any(reg_paths,  28),
+        "r24":   _load_any(reg_paths,  24),
     }
     return _PERIODIC_FONT_CACHE
 
@@ -710,69 +718,54 @@ def _render_periodic_card(
     delta_profit: float,
     uptime: str,
 ) -> Image.Image:
-    img = Image.new("RGB", (_PC_W, _PC_H), _L_BG)
+    img = Image.new("RGB", (_PC_W, _PC_H), _P_BG)
     draw = ImageDraw.Draw(img)
     pf = _periodic_fonts()
-    pad = 20
+    pad = 64
 
-    accent = _lp_accent(total_profit)
     pnl_color = _lp_color(total_profit)
 
-    # ── Top accent bar ──
-    draw.rectangle([(0, 0), (_PC_W, 4)], fill=accent)
+    # ── Subtle card border for Telegram dark mode visibility ──
+    draw.rectangle([(0, 0), (_PC_W - 1, _PC_H - 1)], outline=_P_CARD_EDGE, width=2)
 
-    # ── Row 1: symbol + badge + label ──
-    y = 14
-    _text(draw, pad, y, symbol, pf["b20"], _L_TEXT_PRI)
-    sym_w = _tw(draw, symbol, pf["b20"])
-    badge_color = _L_GREEN_DK if strategy_type.startswith("Spot") else (180, 130, 20)
-    badge_bg = _L_GREEN_BG if strategy_type.startswith("Spot") else (255, 243, 210)
-    _badge(draw, pad + sym_w + 8, y + 2, strategy_type.upper(), badge_color, badge_bg, pf["b13"])
-    _text_right(draw, _PC_W - pad, y + 3, label, pf["r13"], _L_TEXT_MUT)
+    # ── Symbol + Strategy type ──
+    _text(draw, pad, 36, f"{symbol}  {strategy_type}", pf["b48"], _P_WHITE)
+    # ── Label | Uptime ──
+    _text(draw, pad, 90, f"{label}  |  {uptime}", pf["r28"], _P_GREY)
 
-    # ── Hero PnL ──
+    # ── Hero profit number — MASSIVE ──
     pnl_str = _signed(total_profit)
-    pnl_y = 48
-    _text_centered(draw, _PC_W // 2, pnl_y, pnl_str, pf["hero"], pnl_color)
+    _text(draw, pad, 140, pnl_str, pf["hero"], pnl_color)
 
-    # ── Delta pill ──
+    # ── Delta this period ──
     delta_str = f"{_signed(delta_profit)} this period"
-    pill_color = _lp_color(delta_profit)
-    pill_bg = _lp_bg(delta_profit)
-    pill_w = _tw(draw, delta_str, pf["r13"]) + 20
-    pill_x = (_PC_W - pill_w) // 2
-    pill_y = 104
-    _badge(draw, pill_x, pill_y, delta_str, pill_color, pill_bg, pf["r13"], h_pad=10, v_pad=4)
+    _text(draw, pad, 280, delta_str, pf["r34"], _lp_color(delta_profit))
 
-    # ── Divider ──
-    div_y = 134
-    draw.line([(pad, div_y), (_PC_W - pad, div_y)], fill=_L_BORDER, width=1)
+    # ── Bottom metrics: two columns ──
+    col1_x = pad
+    col2_x = _PC_W // 2 + 30
+    label_y = 370
+    value_y = 410
 
-    # ── Matched Trades row ──
-    row_y = 146
-    _text(draw, pad, row_y, "Matched Trades", pf["r16"], _L_TEXT_SEC)
-    trades_str = str(roundtrips)
-    _text_right(draw, _PC_W - pad, row_y, trades_str, pf["b20"], _L_TEXT_PRI)
+    _text(draw, col1_x, label_y, "Matched Trades", pf["r28"], _P_GREY)
+    trades_val = str(roundtrips)
     if delta_roundtrips > 0:
-        dt_str = f"+{delta_roundtrips}"
-        dt_w = _tw(draw, trades_str, pf["b20"])
-        _text_right(draw, _PC_W - pad - dt_w - 10, row_y + 2, dt_str, pf["r14"], _L_GREEN_DK)
+        trades_val = f"{roundtrips}  (+{delta_roundtrips})"
+    _text(draw, col1_x, value_y, trades_val, pf["b40"], _P_WHITE)
 
-    # ── Uptime row ──
-    row2_y = 176
-    _text(draw, pad, row2_y, "Uptime", pf["r16"], _L_TEXT_SEC)
-    _text_right(draw, _PC_W - pad, row2_y, uptime, pf["b16"], _L_TEXT_PRI)
+    _text(draw, col2_x, label_y, "Net Earned", pf["r28"], _P_GREY)
+    _text(draw, col2_x, value_y, _signed(delta_profit), pf["b40"], _lp_color(delta_profit))
 
     # ── Footer ──
-    foot_y = 210
-    draw.line([(pad, foot_y), (_PC_W - pad, foot_y)], fill=_L_BORDER, width=1)
-    fy = foot_y + 9
-    dot_cx = pad + 6
-    dot_cy = fy + 6
-    draw.ellipse([(dot_cx - 4, dot_cy - 4), (dot_cx + 4, dot_cy + 4)], fill=_L_GREEN)
-    _text(draw, dot_cx + 10, fy, "LIVE", pf["b13"], _L_GREEN_DK)
-    ts = datetime.now().strftime("%H:%M · %b %d")
-    _text_right(draw, _PC_W - pad, fy, ts, pf["r13"], _L_TEXT_MUT)
+    foot_y = _PC_H - 60
+    draw.line([(pad, foot_y), (_PC_W - pad, foot_y)], fill=_P_DIVIDER, width=2)
+    fy = foot_y + 18
+    dot_cx = pad + 10
+    dot_cy = fy + 10
+    draw.ellipse([(dot_cx - 7, dot_cy - 7), (dot_cx + 7, dot_cy + 7)], fill=_P_GREEN)
+    _text(draw, dot_cx + 20, fy, "LIVE", pf["b30"], _P_GREEN)
+    ts = datetime.now().strftime("%H:%M  %b %d")
+    _text_right(draw, _PC_W - pad, fy, ts, pf["r24"], _P_GREY)
 
     return img
 
