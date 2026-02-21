@@ -628,7 +628,7 @@ def _ls_draw_symbol_row(
                bias_color, bias_bg, f["b14"])
 
     uptime_str = f"uptime  {uptime}"
-    _text_vcenter_right(draw, _LS_W - _LS_PAD, y, h, uptime_str, f["r16"], p["text_sec"])
+    _text_vcenter_right(draw, _LS_W - _LS_PAD, y, h, uptime_str, f["r16"], p["text_mut"])
 
     end_y = y + h
     _ls_divider(draw, end_y, p)
@@ -756,8 +756,8 @@ def _ls_draw_grid_section(
     bar_x1 = _LS_PAD + low_w + BAR_GAP
     bar_x2 = _LS_W - _LS_PAD - zones_w - BAR_GAP - high_w - BAR_GAP
 
-    _text(draw, _LS_PAD, content_y, low_str, mf, p["text_sec"])
-    _text(draw, bar_x2 + BAR_GAP, content_y, high_str, mf, p["text_sec"])
+    _text(draw, _LS_PAD, content_y, low_str, mf, p["text_pri"])
+    _text(draw, bar_x2 + BAR_GAP, content_y, high_str, mf, p["text_pri"])
 
     bb = _textsize(draw, low_str, mf)
     bar_h = 8
@@ -768,13 +768,13 @@ def _ls_draw_grid_section(
         draw.rounded_rectangle([(bar_x1 + 1, bar_y + 1), (bar_x2 - 1, bar_y + bar_h - 1)],
                                 radius=3, fill=p["accent_dim"])
 
-    _text(draw, _LS_W - _LS_PAD - zones_w, content_y, zones_str, zf, p["text_sec"])
+    _text(draw, _LS_W - _LS_PAD - zones_w, content_y, zones_str, zf, p["text_pri"])
 
     bottom_y = content_y + 30
     trigger_str = f"Trigger: ${_fp(trigger)}" if trigger is not None else "Trigger: \u2014"
     invest_str = f"Investment: ${_fp(investment)}"
-    _text(draw, _LS_PAD, bottom_y, trigger_str, f["r14"], p["text_sec"])
-    _text_right(draw, _LS_W - _LS_PAD, bottom_y, invest_str, f["r14"], p["text_sec"])
+    _text(draw, _LS_PAD, bottom_y, trigger_str, f["r14"], p["text_pri"])
+    _text_right(draw, _LS_W - _LS_PAD, bottom_y, invest_str, f["r14"], p["text_pri"])
 
     end_y = y + h
     _ls_divider(draw, end_y, p)
