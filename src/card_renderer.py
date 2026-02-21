@@ -740,26 +740,25 @@ def _ls_draw_grid_section(
 
     _text(draw, _LS_PAD, y + 16, "GRID RANGE", f["r14"], p["text_mut"])
 
-    mf = f["mn16"]
-    zf = f["r16"]
+    vf = f["b16"]
     content_y = y + 42
 
     low_str = f"${_fp(grid_range_low)}"
     high_str = f"${_fp(grid_range_high)}"
     zones_str = f"{grid_count} zones \u00b7 {_format_spacing(grid_spacing_pct)}"
 
-    low_w = _tw(draw, low_str, mf)
-    high_w = _tw(draw, high_str, mf)
-    zones_w = _tw(draw, zones_str, zf)
+    low_w = _tw(draw, low_str, vf)
+    high_w = _tw(draw, high_str, vf)
+    zones_w = _tw(draw, zones_str, vf)
 
     BAR_GAP = 14
     bar_x1 = _LS_PAD + low_w + BAR_GAP
     bar_x2 = _LS_W - _LS_PAD - zones_w - BAR_GAP - high_w - BAR_GAP
 
-    _text(draw, _LS_PAD, content_y, low_str, mf, p["text_pri"])
-    _text(draw, bar_x2 + BAR_GAP, content_y, high_str, mf, p["text_pri"])
+    _text(draw, _LS_PAD, content_y, low_str, vf, p["text_pri"])
+    _text(draw, bar_x2 + BAR_GAP, content_y, high_str, vf, p["text_pri"])
 
-    bb = _textsize(draw, low_str, mf)
+    bb = _textsize(draw, low_str, vf)
     bar_h = 8
     bar_y = content_y + (bb[3] - bb[1]) // 2 - bar_h // 2
     if bar_x2 > bar_x1 + 10:
@@ -768,13 +767,13 @@ def _ls_draw_grid_section(
         draw.rounded_rectangle([(bar_x1 + 1, bar_y + 1), (bar_x2 - 1, bar_y + bar_h - 1)],
                                 radius=3, fill=p["accent_dim"])
 
-    _text(draw, _LS_W - _LS_PAD - zones_w, content_y, zones_str, zf, p["text_pri"])
+    _text(draw, _LS_W - _LS_PAD - zones_w, content_y, zones_str, vf, p["text_pri"])
 
     bottom_y = content_y + 30
     trigger_str = f"Trigger: ${_fp(trigger)}" if trigger is not None else "Trigger: \u2014"
     invest_str = f"Investment: ${_fp(investment)}"
-    _text(draw, _LS_PAD, bottom_y, trigger_str, f["r14"], p["text_pri"])
-    _text_right(draw, _LS_W - _LS_PAD, bottom_y, invest_str, f["r14"], p["text_pri"])
+    _text(draw, _LS_PAD, bottom_y, trigger_str, f["b14"], p["text_pri"])
+    _text_right(draw, _LS_W - _LS_PAD, bottom_y, invest_str, f["b14"], p["text_pri"])
 
     end_y = y + h
     _ls_divider(draw, end_y, p)
