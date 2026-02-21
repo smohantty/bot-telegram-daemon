@@ -827,10 +827,14 @@ def _render_spot_status_card(
         summary.total_fees, summary.roundtrips, p,
     )
 
+    parts = summary.symbol.split("/")
+    base_ticker = parts[0]
+    quote_ticker = parts[1] if len(parts) > 1 else "USDC"
+
     entry_str = f"${_fp(summary.initial_entry_price)}" if summary.initial_entry_price else "\u2014"
     y = _ls_draw_metric_row(draw, y, [
-        ("Base Balance", f"{summary.base_balance:.4f}", p["text_pri"]),
-        ("Quote Balance", f"${_fp(summary.quote_balance)}", p["text_sec"]),
+        (base_ticker, f"{summary.base_balance:.4f}", p["text_pri"]),
+        (quote_ticker, f"${_fp(summary.quote_balance)}", p["text_sec"]),
         ("Entry Price", entry_str, p["text_sec"]),
     ], p)
 
@@ -874,6 +878,9 @@ def _render_perp_status_card(
         unrealized_pnl=summary.unrealized_pnl,
     )
 
+    parts = summary.symbol.split("/")
+    quote_ticker = parts[1] if len(parts) > 1 else "USDC"
+
     side = summary.position_side.lower()
     pos_color = p["green"] if side == "long" else p["red"] if side == "short" else p["text_mut"]
     pos_text = f"{summary.position_side}  {abs(summary.position_size):.4f}"
@@ -881,7 +888,7 @@ def _render_perp_status_card(
 
     y = _ls_draw_metric_row(draw, y, [
         ("Position", pos_text, pos_color),
-        ("Margin Balance", f"${_fp(summary.margin_balance)}", p["text_sec"]),
+        (f"Margin ({quote_ticker})", f"${_fp(summary.margin_balance)}", p["text_sec"]),
         ("Avg Entry", f"${_fp(summary.avg_entry_price)}", p["text_sec"]),
     ], p)
 
