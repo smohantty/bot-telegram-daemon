@@ -92,7 +92,7 @@ _STATUS_FONT_CACHE: dict | None = None
 
 
 def _status_fonts() -> dict:
-    """Font cache scaled for 1080px-wide light status card."""
+    """Font cache for 780px-wide status card."""
     global _STATUS_FONT_CACHE
     if _STATUS_FONT_CACHE:
         return _STATUS_FONT_CACHE
@@ -118,9 +118,7 @@ def _status_fonts() -> dict:
         "b48": _load_any(bold_paths, 48),
         "r14": _load_any(reg_paths,  14),
         "r16": _load_any(reg_paths,  16),
-        "r18": _load_any(reg_paths,  18),
         "mn14": _load_any(mono_paths, 14),
-        "mn16": _load_any(mono_paths, 16),
     }
     return _STATUS_FONT_CACHE
 
@@ -319,7 +317,6 @@ def _periodic_fonts() -> dict:
         "b34":   _load_any(bold_paths, 34),
         "b28":   _load_any(bold_paths, 28),
         "b20":   _load_any(bold_paths, 20),
-        "r22":   _load_any(reg_paths,  22),
         "r18":   _load_any(reg_paths,  18),
         "r16":   _load_any(reg_paths,  16),
     }
@@ -357,7 +354,7 @@ def _render_periodic_card(
 
     # ── Delta this period ──
     delta_str = f"{_signed(delta_profit)} this period"
-    _text(draw, pad, 142, delta_str, pf["r22"], _lp_color(delta_profit))
+    _text(draw, pad, 142, delta_str, pf["b20"], _lp_color(delta_profit))
 
     # ── Bottom metrics: two columns ──
     col1_x = pad
@@ -414,7 +411,7 @@ def _render_periodic_card_light(
     _text(draw, pad, 20, f"{symbol}  {strategy_type}", pf["b34"], L_TEXT_PRI)
 
     # ── Label | Uptime ──
-    _text(draw, pad, 52, f"{label}  |  {uptime}", pf["r18"], L_TEXT_SEC)
+    _text(draw, pad, 52, f"{label}  |  {uptime}", pf["r18"], L_TEXT_MUT)
 
     # ── Hero PnL number on tinted background ──
     hero_y = 76
@@ -433,7 +430,7 @@ def _render_periodic_card_light(
 
     # ── Delta this period ──
     delta_str = f"{_signed(delta_profit)} this period"
-    _text(draw, pad, hero_y + hero_h + 10, delta_str, pf["r22"], _pal_pnl_color(delta_profit, _LIGHT_PAL))
+    _text(draw, pad, hero_y + hero_h + 10, delta_str, pf["b20"], _pal_pnl_color(delta_profit, _LIGHT_PAL))
 
     # ── Bottom metrics: two columns ──
     col1_x = pad
