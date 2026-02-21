@@ -14,7 +14,7 @@ from telegram import Update
 from telegram.constants import ParseMode
 from telegram.ext import Application, CommandHandler, ContextTypes
 
-from .card_renderer import build_card_from_state, build_periodic_card, build_status_card
+from .card_renderer import build_periodic_card, build_status_card
 from .config import TelegramConfig
 from .formatter import (
     format_bot_status,
