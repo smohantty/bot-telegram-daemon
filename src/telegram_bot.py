@@ -136,8 +136,7 @@ class TelegramBot:
 
     async def send_initial_summary(self, label: str, state: BotState) -> None:
         """Send full summary when a bot first reports data."""
-        msg = format_bot_status(label, state)
-        await self._send_safe(self._chat_id, msg)
+        await self._send_status_card(self._chat_id, label, state)
 
     async def send_error_alert(self, label: str, error_msg: str) -> None:
         """Send an immediate error alert."""

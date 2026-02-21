@@ -62,8 +62,8 @@ L_RED_BG    = (254, 242, 242)   # red-50 tint
 L_ACCENT_BG = (239, 246, 255)   # blue-50 tint
 
 # Light status card geometry
-_LS_W = 1080
-_LS_PAD = 48
+_LS_W = 780
+_LS_PAD = 40
 
 # ---------------------------------------------------------------------------
 # Card geometry
@@ -328,9 +328,9 @@ def _fp(price: float) -> str:
     elif price >= 1.0:
         return f"{price:.2f}"
     elif price >= 0.01:
-        return f"{price:.4f}"
+        return f"{price:.3f}"
     else:
-        return f"{price:.6f}"
+        return f"{price:.2f}"
 
 
 def _signed(value: float) -> str:
@@ -730,9 +730,9 @@ _P_GREY      = (148, 158, 172)    # labels — brighter for readability
 _P_GREEN     = (14,  203, 129)    # Binance green
 _P_RED       = (246, 70,  93)     # Binance red
 
-# Large canvas so fonts stay readable after Telegram scaling
-_PC_W = 1080
-_PC_H = 580
+# Compact canvas — tight fit for periodic content
+_PC_W = 540
+_PC_H = 340
 
 
 def _lp_color(value: float) -> tuple:
@@ -757,13 +757,13 @@ def _periodic_fonts() -> dict:
     ]
 
     _PERIODIC_FONT_CACHE = {
-        "hero":  _load_any(bold_paths, 128),
-        "b48":   _load_any(bold_paths, 48),
-        "b40":   _load_any(bold_paths, 40),
-        "b30":   _load_any(bold_paths, 30),
-        "r34":   _load_any(reg_paths,  34),
-        "r28":   _load_any(reg_paths,  28),
-        "r24":   _load_any(reg_paths,  24),
+        "hero":  _load_any(bold_paths, 60),
+        "b34":   _load_any(bold_paths, 34),
+        "b28":   _load_any(bold_paths, 28),
+        "b20":   _load_any(bold_paths, 20),
+        "r22":   _load_any(reg_paths,  22),
+        "r18":   _load_any(reg_paths,  18),
+        "r16":   _load_any(reg_paths,  16),
     }
     return _PERIODIC_FONT_CACHE
 
@@ -781,7 +781,7 @@ def _render_periodic_card(
     img = Image.new("RGB", (_PC_W, _PC_H), _P_BG)
     draw = ImageDraw.Draw(img)
     pf = _periodic_fonts()
-    pad = 64
+    pad = 34
 
     pnl_color = _lp_color(total_profit)
 
@@ -789,43 +789,43 @@ def _render_periodic_card(
     draw.rectangle([(0, 0), (_PC_W - 1, _PC_H - 1)], outline=_P_CARD_EDGE, width=2)
 
     # ── Symbol + Strategy type ──
-    _text(draw, pad, 36, f"{symbol}  {strategy_type}", pf["b48"], _P_WHITE)
+    _text(draw, pad, 20, f"{symbol}  {strategy_type}", pf["b34"], _P_WHITE)
     # ── Label | Uptime ──
-    _text(draw, pad, 90, f"{label}  |  {uptime}", pf["r28"], _P_GREY)
+    _text(draw, pad, 52, f"{label}  |  {uptime}", pf["r18"], _P_GREY)
 
-    # ── Hero profit number — MASSIVE ──
+    # ── Hero profit number ──
     pnl_str = _signed(total_profit)
-    _text(draw, pad, 140, pnl_str, pf["hero"], pnl_color)
+    _text(draw, pad, 82, pnl_str, pf["hero"], pnl_color)
 
     # ── Delta this period ──
     delta_str = f"{_signed(delta_profit)} this period"
-    _text(draw, pad, 280, delta_str, pf["r34"], _lp_color(delta_profit))
+    _text(draw, pad, 142, delta_str, pf["r22"], _lp_color(delta_profit))
 
     # ── Bottom metrics: two columns ──
     col1_x = pad
-    col2_x = _PC_W // 2 + 30
-    label_y = 370
-    value_y = 410
+    col2_x = _PC_W // 2 + 10
+    label_y = 192
+    value_y = 214
 
-    _text(draw, col1_x, label_y, "Matched Trades", pf["r28"], _P_GREY)
+    _text(draw, col1_x, label_y, "Matched Trades", pf["r18"], _P_GREY)
     trades_val = str(roundtrips)
     if delta_roundtrips > 0:
         trades_val = f"{roundtrips}  (+{delta_roundtrips})"
-    _text(draw, col1_x, value_y, trades_val, pf["b40"], _P_WHITE)
+    _text(draw, col1_x, value_y, trades_val, pf["b28"], _P_WHITE)
 
-    _text(draw, col2_x, label_y, "Net Earned", pf["r28"], _P_GREY)
-    _text(draw, col2_x, value_y, _signed(delta_profit), pf["b40"], _lp_color(delta_profit))
+    _text(draw, col2_x, label_y, "Net Earned", pf["r18"], _P_GREY)
+    _text(draw, col2_x, value_y, _signed(delta_profit), pf["b28"], _lp_color(delta_profit))
 
     # ── Footer ──
-    foot_y = _PC_H - 60
-    draw.line([(pad, foot_y), (_PC_W - pad, foot_y)], fill=_P_DIVIDER, width=2)
-    fy = foot_y + 18
-    dot_cx = pad + 10
-    dot_cy = fy + 10
-    draw.ellipse([(dot_cx - 7, dot_cy - 7), (dot_cx + 7, dot_cy + 7)], fill=_P_GREEN)
-    _text(draw, dot_cx + 20, fy, "LIVE", pf["b30"], _P_GREEN)
+    foot_y = _PC_H - 42
+    draw.line([(pad, foot_y), (_PC_W - pad, foot_y)], fill=_P_DIVIDER, width=1)
+    fy = foot_y + 12
+    dot_cx = pad + 8
+    dot_cy = fy + 8
+    draw.ellipse([(dot_cx - 5, dot_cy - 5), (dot_cx + 5, dot_cy + 5)], fill=_P_GREEN)
+    _text(draw, dot_cx + 16, fy, "LIVE", pf["b20"], _P_GREEN)
     ts = datetime.now().strftime("%H:%M  %b %d")
-    _text_right(draw, _PC_W - pad, fy, ts, pf["r24"], _P_GREY)
+    _text_right(draw, _PC_W - pad, fy, ts, pf["r16"], _P_GREY)
 
     return img
 
@@ -840,73 +840,68 @@ def _render_periodic_card_light(
     delta_profit: float,
     uptime: str,
 ) -> Image.Image:
-    """Light-theme periodic card — white/blue palette matching light status card."""
+    """Light-theme periodic card — white/blue palette, same layout as dark."""
     img = Image.new("RGB", (_PC_W, _PC_H), L_BG)
     draw = ImageDraw.Draw(img)
-    sf = _status_fonts()
-    pad = 64
+    pf = _periodic_fonts()
+    pad = 34
 
     pnl_color = _ls_pnl_color(total_profit)
 
-    # ── Top accent bar (4px blue) + subtle border ──
-    draw.rectangle([(0, 0), (_PC_W, 4)], fill=L_ACCENT)
+    # ── Top accent bar (3px blue) + subtle border ──
+    draw.rectangle([(0, 0), (_PC_W, 3)], fill=L_ACCENT)
     draw.rectangle([(0, 0), (_PC_W - 1, _PC_H - 1)], outline=L_BORDER, width=2)
 
     # ── Symbol + Strategy type ──
-    _text(draw, pad, 36, f"{symbol}  {strategy_type}", sf["b28"], L_TEXT_PRI)
+    _text(draw, pad, 20, f"{symbol}  {strategy_type}", pf["b34"], L_TEXT_PRI)
 
     # ── Label | Uptime ──
-    _text(draw, pad, 72, f"{label}  |  {uptime}", sf["r16"], L_TEXT_SEC)
+    _text(draw, pad, 52, f"{label}  |  {uptime}", pf["r18"], L_TEXT_SEC)
 
     # ── Hero PnL number on tinted background ──
-    hero_y = 110
-    hero_h = 130
+    hero_y = 76
+    hero_h = 68
     pnl_bg = _ls_pnl_bg(total_profit)
     draw.rounded_rectangle(
-        [(pad - 16, hero_y), (_PC_W - pad + 16, hero_y + hero_h)],
-        radius=12, fill=pnl_bg,
+        [(pad - 12, hero_y), (_PC_W - pad + 12, hero_y + hero_h)],
+        radius=10, fill=pnl_bg,
     )
 
     pnl_str = _signed(total_profit)
-    # Use a large font — scale up from status fonts
-    pnl_font = _load_any([
-        _UBUNTU_DIR + "Ubuntu-B.ttf", _DEJAVU_DIR + "DejaVuSans-Bold.ttf",
-        _MAC_SUPP_DIR + "Arial Bold.ttf", _MAC_SYS_DIR + "Helvetica.ttc",
-    ], 80)
-    bb = _textsize(draw, pnl_str, pnl_font)
+    bb = _textsize(draw, pnl_str, pf["hero"])
     pnl_text_h = bb[3] - bb[1]
     pnl_y = hero_y + (hero_h - pnl_text_h) // 2
-    _text(draw, pad, pnl_y, pnl_str, pnl_font, pnl_color)
+    _text(draw, pad, pnl_y, pnl_str, pf["hero"], pnl_color)
 
     # ── Delta this period ──
     delta_str = f"{_signed(delta_profit)} this period"
-    _text(draw, pad, hero_y + hero_h + 16, delta_str, sf["r18"], _ls_pnl_color(delta_profit))
+    _text(draw, pad, hero_y + hero_h + 10, delta_str, pf["r22"], _ls_pnl_color(delta_profit))
 
     # ── Bottom metrics: two columns ──
     col1_x = pad
-    col2_x = _PC_W // 2 + 30
-    label_y = 330
-    value_y = 362
+    col2_x = _PC_W // 2 + 10
+    label_y = 192
+    value_y = 214
 
-    _text(draw, col1_x, label_y, "Matched Trades", sf["r16"], L_TEXT_MUT)
+    _text(draw, col1_x, label_y, "Matched Trades", pf["r18"], L_TEXT_MUT)
     trades_val = str(roundtrips)
     if delta_roundtrips > 0:
         trades_val = f"{roundtrips}  (+{delta_roundtrips})"
-    _text(draw, col1_x, value_y, trades_val, sf["b28"], L_TEXT_PRI)
+    _text(draw, col1_x, value_y, trades_val, pf["b28"], L_TEXT_PRI)
 
-    _text(draw, col2_x, label_y, "Net Earned", sf["r16"], L_TEXT_MUT)
-    _text(draw, col2_x, value_y, _signed(delta_profit), sf["b28"], _ls_pnl_color(delta_profit))
+    _text(draw, col2_x, label_y, "Net Earned", pf["r18"], L_TEXT_MUT)
+    _text(draw, col2_x, value_y, _signed(delta_profit), pf["b28"], _ls_pnl_color(delta_profit))
 
     # ── Footer ──
-    foot_y = _PC_H - 60
+    foot_y = _PC_H - 42
     draw.line([(pad, foot_y), (_PC_W - pad, foot_y)], fill=L_BORDER, width=1)
-    fy = foot_y + 18
-    dot_cx = pad + 10
-    dot_cy = fy + 10
-    draw.ellipse([(dot_cx - 7, dot_cy - 7), (dot_cx + 7, dot_cy + 7)], fill=L_GREEN)
-    _text(draw, dot_cx + 20, fy, "LIVE", sf["b20"], L_GREEN)
+    fy = foot_y + 12
+    dot_cx = pad + 8
+    dot_cy = fy + 8
+    draw.ellipse([(dot_cx - 5, dot_cy - 5), (dot_cx + 5, dot_cy + 5)], fill=L_GREEN)
+    _text(draw, dot_cx + 16, fy, "LIVE", pf["b20"], L_GREEN)
     ts = datetime.now().strftime("%H:%M  %b %d")
-    _text_right(draw, _PC_W - pad, fy, ts, sf["r16"], L_TEXT_MUT)
+    _text_right(draw, _PC_W - pad, fy, ts, pf["r16"], L_TEXT_MUT)
 
     return img
 
@@ -982,7 +977,7 @@ def _ls_draw_header(
 ) -> int:
     """Draw header row. Returns next Y."""
     f = _status_fonts()
-    h = 60
+    h = 64
 
     # Label — left
     _text_vcenter(draw, _LS_PAD, y, h, label, f["b20"], L_TEXT_PRI)
@@ -1028,7 +1023,7 @@ def _ls_draw_symbol_row(
 ) -> int:
     """Draw symbol row with badges. Returns next Y."""
     f = _status_fonts()
-    h = 56
+    h = 60
 
     # Symbol text
     sym_font = f["b28"]
@@ -1078,7 +1073,7 @@ def _ls_draw_pnl_section(
 ) -> int:
     """Draw PnL section: hero number left, breakdown right. Returns next Y."""
     f = _status_fonts()
-    h = 130
+    h = 150
     mid_x = _LS_W // 2
 
     # Left: tinted background with hero PnL
@@ -1088,25 +1083,25 @@ def _ls_draw_pnl_section(
     _ls_vdivider(draw, mid_x, y, h)
 
     # Left: NET PROFIT label + hero number
-    label_y = y + 18
+    label_y = y + 24
     _text(draw, _LS_PAD, label_y, "NET PROFIT", f["r14"], L_TEXT_MUT)
 
     pnl_text = _signed(net_profit)
     pnl_font = f["b48"]
-    pnl_y = label_y + 22
+    pnl_y = label_y + 26
     _text(draw, _LS_PAD, pnl_y, pnl_text, pnl_font, _ls_pnl_color(net_profit))
 
     # Unrealized PnL (perp only)
     if unrealized_pnl is not None:
         pbb = _textsize(draw, pnl_text, pnl_font)
-        unreal_y = pnl_y + (pbb[3] - pbb[1]) + 8
+        unreal_y = pnl_y + (pbb[3] - pbb[1]) + 10
         unreal_str = f"unrealized  {_signed(unrealized_pnl)}"
         _text(draw, _LS_PAD, unreal_y, unreal_str, f["r14"], _ls_pnl_color(unrealized_pnl))
 
     # Right: breakdown rows
     rx = mid_x + _LS_PAD
-    row_y = y + 18
-    row_gap = 28
+    row_y = y + 24
+    row_gap = 32
 
     if unrealized_pnl is not None:
         _text(draw, rx, row_y, "REALIZED", f["r14"], L_TEXT_MUT)
@@ -1138,7 +1133,7 @@ def _ls_draw_metric_row(
 ) -> int:
     """Three equal-width metric cells: label on top, bold value below. Returns next Y."""
     f = _status_fonts()
-    h = 80
+    h = 96
     col_w = _LS_W // 3
 
     for i, (label, value, color) in enumerate(cells):
@@ -1148,8 +1143,8 @@ def _ls_draw_metric_row(
         if i > 0:
             _ls_vdivider(draw, x_start, y, h)
 
-        _text_centered(draw, cx, y + 14, label.upper(), f["r14"], L_TEXT_MUT)
-        _text_centered(draw, cx, y + 40, value, f["b20"], color)
+        _text_centered(draw, cx, y + 20, label.upper(), f["r14"], L_TEXT_MUT)
+        _text_centered(draw, cx, y + 48, value, f["b20"], color)
 
     end_y = y + h
     _ls_divider(draw, end_y)
@@ -1168,18 +1163,18 @@ def _ls_draw_grid_section(
 ) -> int:
     """Draw grid range bar + zones/spacing + trigger + investment. Returns next Y."""
     f = _status_fonts()
-    h = 100
+    h = 112
 
     # Section bg
     draw.rectangle([(0, y), (_LS_W, y + h)], fill=L_SECTION)
 
     # "GRID RANGE" label
-    _text(draw, _LS_PAD, y + 12, "GRID RANGE", f["r14"], L_TEXT_MUT)
+    _text(draw, _LS_PAD, y + 16, "GRID RANGE", f["r14"], L_TEXT_MUT)
 
     # Range bar row
     mf = f["mn16"]
     zf = f["r16"]
-    content_y = y + 36
+    content_y = y + 42
 
     low_str = f"${_fp(grid_range_low)}"
     high_str = f"${_fp(grid_range_high)}"
@@ -1223,7 +1218,7 @@ def _ls_draw_grid_section(
 def _ls_draw_footer(draw: ImageDraw.ImageDraw, y: int, state: str) -> int:
     """Draw footer with status dot + state label + date. Returns next Y."""
     f = _status_fonts()
-    h = 44
+    h = 52
 
     dot_color = L_GREEN if state.lower() == "running" else L_GOLD
     dot_cx = _LS_PAD + 8

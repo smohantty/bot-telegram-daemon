@@ -225,10 +225,10 @@ class TestLightPeriodicCardSmoke:
         assert img.size == (_PC_W, _PC_H)
         assert img.mode == "RGB"
 
-    def test_light_periodic_card_width_1080(self, connected_perp_state: BotState) -> None:
+    def test_light_periodic_card_width(self, connected_perp_state: BotState) -> None:
         buf = build_periodic_card("Test-Perp", connected_perp_state, theme="light")
         img = Image.open(buf)
-        assert img.size[0] == 1080
+        assert img.size[0] == _PC_W
 
     def test_light_periodic_card_with_deltas(self, connected_spot_state: BotState) -> None:
         connected_spot_state.prev_roundtrips = 10
