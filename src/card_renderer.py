@@ -834,8 +834,8 @@ def _render_spot_status_card(
     entry_str = f"${_fp(summary.initial_entry_price)}" if summary.initial_entry_price else "\u2014"
     y = _ls_draw_metric_row(draw, y, [
         (base_ticker, f"{summary.base_balance:.4f}", p["text_pri"]),
-        (quote_ticker, f"${_fp(summary.quote_balance)}", p["text_sec"]),
-        ("Entry Price", entry_str, p["text_sec"]),
+        (quote_ticker, f"${_fp(summary.quote_balance)}", p["text_pri"]),
+        ("Entry Price", entry_str, p["text_pri"]),
     ], p)
 
     y = _ls_draw_grid_section(
@@ -888,8 +888,8 @@ def _render_perp_status_card(
 
     y = _ls_draw_metric_row(draw, y, [
         ("Position", pos_text, pos_color),
-        (f"Margin ({quote_ticker})", f"${_fp(summary.margin_balance)}", p["text_sec"]),
-        ("Avg Entry", f"${_fp(summary.avg_entry_price)}", p["text_sec"]),
+        (f"Margin ({quote_ticker})", f"${_fp(summary.margin_balance)}", p["text_pri"]),
+        ("Avg Entry", f"${_fp(summary.avg_entry_price)}", p["text_pri"]),
     ], p)
 
     f = _status_fonts()
