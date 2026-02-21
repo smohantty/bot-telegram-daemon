@@ -46,7 +46,7 @@ async def main() -> None:
     )
 
     # Create components
-    telegram_bot = TelegramBot(config.telegram)
+    telegram_bot = TelegramBot(config.telegram, card_theme=config.reporting.card_theme)
     monitor = Monitor(config, telegram_bot)
     telegram_bot.set_monitor(monitor)
 

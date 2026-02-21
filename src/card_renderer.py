@@ -1,8 +1,9 @@
 """Report card image generator for Telegram updates.
 
-Provides two card styles:
-- Full detail card (dark theme, 800×480) for on-demand /status
-- Compact periodic card (light theme, 600×280) highlighting trades & profit
+Provides three card styles:
+- Full detail card (dark theme, 800×480) for on-demand /status (legacy)
+- Compact periodic card (dark theme, 1080×580) highlighting trades & profit
+- Light status card (light/white theme, 1080×dynamic) for /status command
 """
 
 from __future__ import annotations
@@ -41,6 +42,28 @@ C_GREEN_BG  = (14,  30,  18)
 C_RED_BG    = (30,  14,  14)
 C_CYAN_BG   = (6,   30,  26)
 C_GOLD_BG   = (32,  24,  6)
+
+# ---------------------------------------------------------------------------
+# Light theme palette — for /status card
+# ---------------------------------------------------------------------------
+L_BG        = (255, 255, 255)     # white background
+L_SECTION   = (248, 250, 252)     # light gray sections (slate-50)
+L_BORDER    = (226, 232, 240)     # light border (slate-200)
+L_ACCENT    = (37,  99,  235)     # blue-600 accent
+L_ACCENT_DIM = (147, 180, 236)   # blue bar fill
+L_GREEN     = (22,  163, 74)     # green-600 (darker for white bg)
+L_RED       = (220, 38,  38)     # red-600
+L_GOLD      = (202, 138, 4)     # amber-600
+L_TEXT_PRI  = (15,  23,  42)     # slate-900
+L_TEXT_SEC  = (71,  85,  105)    # slate-500
+L_TEXT_MUT  = (148, 163, 184)    # slate-400
+L_GREEN_BG  = (240, 253, 244)   # green-50 tint
+L_RED_BG    = (254, 242, 242)   # red-50 tint
+L_ACCENT_BG = (239, 246, 255)   # blue-50 tint
+
+# Light status card geometry
+_LS_W = 1080
+_LS_PAD = 48
 
 # ---------------------------------------------------------------------------
 # Card geometry
@@ -128,6 +151,43 @@ def _fonts() -> dict:
         "mn13": _load_any(mono_paths, 13),
     }
     return _FONT_CACHE
+
+
+_STATUS_FONT_CACHE: dict | None = None
+
+
+def _status_fonts() -> dict:
+    """Font cache scaled for 1080px-wide light status card."""
+    global _STATUS_FONT_CACHE
+    if _STATUS_FONT_CACHE:
+        return _STATUS_FONT_CACHE
+
+    bold_paths = [
+        _UBUNTU_DIR + "Ubuntu-B.ttf", _DEJAVU_DIR + "DejaVuSans-Bold.ttf",
+        _MAC_SUPP_DIR + "Arial Bold.ttf", _MAC_SYS_DIR + "Helvetica.ttc",
+    ]
+    reg_paths = [
+        _UBUNTU_DIR + "Ubuntu-R.ttf", _DEJAVU_DIR + "DejaVuSans.ttf",
+        _MAC_SUPP_DIR + "Arial.ttf", _MAC_SYS_DIR + "Helvetica.ttc",
+    ]
+    mono_paths = [
+        _UBUNTU_DIR + "UbuntuMono-R.ttf", _DEJAVU_DIR + "DejaVuSansMono.ttf",
+        _MAC_SUPP_DIR + "Courier New.ttf",
+    ]
+
+    _STATUS_FONT_CACHE = {
+        "b14": _load_any(bold_paths, 14),
+        "b16": _load_any(bold_paths, 16),
+        "b20": _load_any(bold_paths, 20),
+        "b28": _load_any(bold_paths, 28),
+        "b48": _load_any(bold_paths, 48),
+        "r14": _load_any(reg_paths,  14),
+        "r16": _load_any(reg_paths,  16),
+        "r18": _load_any(reg_paths,  18),
+        "mn14": _load_any(mono_paths, 14),
+        "mn16": _load_any(mono_paths, 16),
+    }
+    return _STATUS_FONT_CACHE
 
 
 # ---------------------------------------------------------------------------
@@ -770,7 +830,88 @@ def _render_periodic_card(
     return img
 
 
-def build_periodic_card(label: str, state: "BotState") -> io.BytesIO:
+def _render_periodic_card_light(
+    label: str,
+    symbol: str,
+    strategy_type: str,
+    total_profit: float,
+    roundtrips: int,
+    delta_roundtrips: int,
+    delta_profit: float,
+    uptime: str,
+) -> Image.Image:
+    """Light-theme periodic card — white/blue palette matching light status card."""
+    img = Image.new("RGB", (_PC_W, _PC_H), L_BG)
+    draw = ImageDraw.Draw(img)
+    sf = _status_fonts()
+    pad = 64
+
+    pnl_color = _ls_pnl_color(total_profit)
+
+    # ── Top accent bar (4px blue) + subtle border ──
+    draw.rectangle([(0, 0), (_PC_W, 4)], fill=L_ACCENT)
+    draw.rectangle([(0, 0), (_PC_W - 1, _PC_H - 1)], outline=L_BORDER, width=2)
+
+    # ── Symbol + Strategy type ──
+    _text(draw, pad, 36, f"{symbol}  {strategy_type}", sf["b28"], L_TEXT_PRI)
+
+    # ── Label | Uptime ──
+    _text(draw, pad, 72, f"{label}  |  {uptime}", sf["r16"], L_TEXT_SEC)
+
+    # ── Hero PnL number on tinted background ──
+    hero_y = 110
+    hero_h = 130
+    pnl_bg = _ls_pnl_bg(total_profit)
+    draw.rounded_rectangle(
+        [(pad - 16, hero_y), (_PC_W - pad + 16, hero_y + hero_h)],
+        radius=12, fill=pnl_bg,
+    )
+
+    pnl_str = _signed(total_profit)
+    # Use a large font — scale up from status fonts
+    pnl_font = _load_any([
+        _UBUNTU_DIR + "Ubuntu-B.ttf", _DEJAVU_DIR + "DejaVuSans-Bold.ttf",
+        _MAC_SUPP_DIR + "Arial Bold.ttf", _MAC_SYS_DIR + "Helvetica.ttc",
+    ], 80)
+    bb = _textsize(draw, pnl_str, pnl_font)
+    pnl_text_h = bb[3] - bb[1]
+    pnl_y = hero_y + (hero_h - pnl_text_h) // 2
+    _text(draw, pad, pnl_y, pnl_str, pnl_font, pnl_color)
+
+    # ── Delta this period ──
+    delta_str = f"{_signed(delta_profit)} this period"
+    _text(draw, pad, hero_y + hero_h + 16, delta_str, sf["r18"], _ls_pnl_color(delta_profit))
+
+    # ── Bottom metrics: two columns ──
+    col1_x = pad
+    col2_x = _PC_W // 2 + 30
+    label_y = 330
+    value_y = 362
+
+    _text(draw, col1_x, label_y, "Matched Trades", sf["r16"], L_TEXT_MUT)
+    trades_val = str(roundtrips)
+    if delta_roundtrips > 0:
+        trades_val = f"{roundtrips}  (+{delta_roundtrips})"
+    _text(draw, col1_x, value_y, trades_val, sf["b28"], L_TEXT_PRI)
+
+    _text(draw, col2_x, label_y, "Net Earned", sf["r16"], L_TEXT_MUT)
+    _text(draw, col2_x, value_y, _signed(delta_profit), sf["b28"], _ls_pnl_color(delta_profit))
+
+    # ── Footer ──
+    foot_y = _PC_H - 60
+    draw.line([(pad, foot_y), (_PC_W - pad, foot_y)], fill=L_BORDER, width=1)
+    fy = foot_y + 18
+    dot_cx = pad + 10
+    dot_cy = fy + 10
+    draw.ellipse([(dot_cx - 7, dot_cy - 7), (dot_cx + 7, dot_cy + 7)], fill=L_GREEN)
+    _text(draw, dot_cx + 20, fy, "LIVE", sf["b20"], L_GREEN)
+    ts = datetime.now().strftime("%H:%M  %b %d")
+    _text_right(draw, _PC_W - pad, fy, ts, sf["r16"], L_TEXT_MUT)
+
+    return img
+
+
+def build_periodic_card(label: str, state: "BotState", theme: str = "dark") -> io.BytesIO:
     """Generate a compact periodic PNG card focused on trades & profit.
 
     Returns BytesIO seeked to 0. Raises ValueError if state.summary is None.
@@ -793,7 +934,8 @@ def build_periodic_card(label: str, state: "BotState") -> io.BytesIO:
     else:
         stype = "Grid"
 
-    img = _render_periodic_card(
+    renderer = _render_periodic_card_light if theme == "light" else _render_periodic_card
+    img = renderer(
         label=label,
         symbol=state.summary.symbol,
         strategy_type=stype,
@@ -803,6 +945,435 @@ def build_periodic_card(label: str, state: "BotState") -> io.BytesIO:
         delta_profit=delta_profit,
         uptime=state.summary.uptime,
     )
+
+    buf = io.BytesIO()
+    img.save(buf, format="PNG", optimize=True)
+    buf.seek(0)
+    return buf
+
+
+# ---------------------------------------------------------------------------
+# Light-theme status card — /status command
+# ---------------------------------------------------------------------------
+
+def _ls_divider(draw: ImageDraw.ImageDraw, y: int) -> None:
+    draw.line([(0, y), (_LS_W, y)], fill=L_BORDER, width=1)
+
+
+def _ls_vdivider(draw: ImageDraw.ImageDraw, x: int, y: int, h: int) -> None:
+    draw.line([(x, y), (x, y + h)], fill=L_BORDER, width=1)
+
+
+def _ls_pnl_color(value: float) -> tuple:
+    return L_GREEN if value >= 0 else L_RED
+
+
+def _ls_pnl_bg(value: float) -> tuple:
+    return L_GREEN_BG if value >= 0 else L_RED_BG
+
+
+def _ls_draw_background(img: Image.Image, draw: ImageDraw.ImageDraw, h: int) -> None:
+    draw.rectangle([(0, 0), (_LS_W, h)], fill=L_BG)
+    draw.rectangle([(0, 0), (_LS_W, 4)], fill=L_ACCENT)
+
+
+def _ls_draw_header(
+    draw: ImageDraw.ImageDraw, y: int, label: str, exchange: str, network: str,
+) -> int:
+    """Draw header row. Returns next Y."""
+    f = _status_fonts()
+    h = 60
+
+    # Label — left
+    _text_vcenter(draw, _LS_PAD, y, h, label, f["b20"], L_TEXT_PRI)
+
+    # Exchange · Network badges
+    mf = f["mn14"]
+    exch_u = exchange.upper()
+    net_u = network.upper()
+    exch_color = L_ACCENT if exchange.lower() == "hyperliquid" else L_GOLD
+    net_color = L_GREEN if network.lower() == "mainnet" else (139, 92, 246)
+
+    exch_w = _tw(draw, exch_u, mf)
+    sep_w = _tw(draw, " \u00b7 ", mf)
+    net_w = _tw(draw, net_u, mf)
+    total_w = exch_w + sep_w + net_w
+    cx_start = (_LS_W - total_w) // 2
+
+    bb = _textsize(draw, exch_u, mf)
+    th = bb[3] - bb[1]
+    ty = y + (h - th) // 2
+
+    _text(draw, cx_start, ty, exch_u, mf, exch_color)
+    _text(draw, cx_start + exch_w, ty, " \u00b7 ", mf, L_TEXT_MUT)
+    _text(draw, cx_start + exch_w + sep_w, ty, net_u, mf, net_color)
+
+    # Timestamp — right
+    ts = datetime.now().strftime("%H:%M")
+    _text_vcenter_right(draw, _LS_W - _LS_PAD, y, h, ts, f["mn14"], L_TEXT_MUT)
+
+    end_y = y + h
+    _ls_divider(draw, end_y)
+    return end_y + 1
+
+
+def _ls_draw_symbol_row(
+    draw: ImageDraw.ImageDraw,
+    y: int,
+    symbol: str,
+    grid_type: str,
+    uptime: str,
+    grid_bias: str | None = None,
+    leverage: int | None = None,
+) -> int:
+    """Draw symbol row with badges. Returns next Y."""
+    f = _status_fonts()
+    h = 56
+
+    # Symbol text
+    sym_font = f["b28"]
+    bb = _textsize(draw, symbol, sym_font)
+    sym_h = bb[3] - bb[1]
+    sym_y = y + (h - sym_h) // 2
+    _text(draw, _LS_PAD, sym_y, symbol, sym_font, L_TEXT_PRI)
+    sym_w = bb[2] - bb[0]
+
+    # Type badge
+    badge_x = _LS_PAD + sym_w + 12
+    badge_y = y + h // 2 - 12
+    if grid_type == "SPOT":
+        badge_color, badge_bg = L_ACCENT, L_ACCENT_BG
+    else:
+        badge_color, badge_bg = L_GOLD, (255, 251, 235)  # amber-50
+    next_x = _badge(draw, badge_x, badge_y, grid_type, badge_color, badge_bg, f["b14"])
+
+    # Perp: bias + leverage badge
+    if grid_type == "PERP" and grid_bias and leverage is not None:
+        if grid_bias.lower() == "long":
+            bias_color, bias_bg = L_GREEN, L_GREEN_BG
+        elif grid_bias.lower() == "short":
+            bias_color, bias_bg = L_RED, L_RED_BG
+        else:
+            bias_color, bias_bg = L_ACCENT, L_ACCENT_BG
+        _badge(draw, next_x + 8, badge_y, f"{grid_bias.upper()} {leverage}\u00d7",
+               bias_color, bias_bg, f["b14"])
+
+    # Uptime — right
+    uptime_str = f"uptime  {uptime}"
+    _text_vcenter_right(draw, _LS_W - _LS_PAD, y, h, uptime_str, f["r16"], L_TEXT_SEC)
+
+    end_y = y + h
+    _ls_divider(draw, end_y)
+    return end_y + 1
+
+
+def _ls_draw_pnl_section(
+    draw: ImageDraw.ImageDraw,
+    y: int,
+    net_profit: float,
+    matched_profit: float,
+    total_fees: float,
+    roundtrips: int,
+    unrealized_pnl: float | None = None,
+) -> int:
+    """Draw PnL section: hero number left, breakdown right. Returns next Y."""
+    f = _status_fonts()
+    h = 130
+    mid_x = _LS_W // 2
+
+    # Left: tinted background with hero PnL
+    draw.rectangle([(0, y), (mid_x - 1, y + h)], fill=_ls_pnl_bg(net_profit))
+    # Right: light section bg
+    draw.rectangle([(mid_x, y), (_LS_W, y + h)], fill=L_SECTION)
+    _ls_vdivider(draw, mid_x, y, h)
+
+    # Left: NET PROFIT label + hero number
+    label_y = y + 18
+    _text(draw, _LS_PAD, label_y, "NET PROFIT", f["r14"], L_TEXT_MUT)
+
+    pnl_text = _signed(net_profit)
+    pnl_font = f["b48"]
+    pnl_y = label_y + 22
+    _text(draw, _LS_PAD, pnl_y, pnl_text, pnl_font, _ls_pnl_color(net_profit))
+
+    # Unrealized PnL (perp only)
+    if unrealized_pnl is not None:
+        pbb = _textsize(draw, pnl_text, pnl_font)
+        unreal_y = pnl_y + (pbb[3] - pbb[1]) + 8
+        unreal_str = f"unrealized  {_signed(unrealized_pnl)}"
+        _text(draw, _LS_PAD, unreal_y, unreal_str, f["r14"], _ls_pnl_color(unrealized_pnl))
+
+    # Right: breakdown rows
+    rx = mid_x + _LS_PAD
+    row_y = y + 18
+    row_gap = 28
+
+    if unrealized_pnl is not None:
+        _text(draw, rx, row_y, "REALIZED", f["r14"], L_TEXT_MUT)
+        _text_right(draw, _LS_W - _LS_PAD, row_y, _signed(matched_profit), f["b16"], _ls_pnl_color(matched_profit))
+        row_y += row_gap
+        _text(draw, rx, row_y, "UNREALIZED", f["r14"], L_TEXT_MUT)
+        _text_right(draw, _LS_W - _LS_PAD, row_y, _signed(unrealized_pnl), f["b16"], _ls_pnl_color(unrealized_pnl))
+    else:
+        _text(draw, rx, row_y, "MATCHED", f["r14"], L_TEXT_MUT)
+        _text_right(draw, _LS_W - _LS_PAD, row_y, _signed(matched_profit), f["b16"], _ls_pnl_color(matched_profit))
+
+    row_y += row_gap
+    _text(draw, rx, row_y, "FEES", f["r14"], L_TEXT_MUT)
+    _text_right(draw, _LS_W - _LS_PAD, row_y, f"-${_fp(total_fees)}", f["b16"], L_RED)
+
+    row_y += row_gap
+    _text(draw, rx, row_y, "TRADES", f["r14"], L_TEXT_MUT)
+    _text_right(draw, _LS_W - _LS_PAD, row_y, str(roundtrips), f["b16"], L_TEXT_PRI)
+
+    end_y = y + h
+    _ls_divider(draw, end_y)
+    return end_y + 1
+
+
+def _ls_draw_metric_row(
+    draw: ImageDraw.ImageDraw,
+    y: int,
+    cells: list[tuple[str, str, tuple]],
+) -> int:
+    """Three equal-width metric cells: label on top, bold value below. Returns next Y."""
+    f = _status_fonts()
+    h = 80
+    col_w = _LS_W // 3
+
+    for i, (label, value, color) in enumerate(cells):
+        x_start = i * col_w
+        cx = x_start + col_w // 2
+
+        if i > 0:
+            _ls_vdivider(draw, x_start, y, h)
+
+        _text_centered(draw, cx, y + 14, label.upper(), f["r14"], L_TEXT_MUT)
+        _text_centered(draw, cx, y + 40, value, f["b20"], color)
+
+    end_y = y + h
+    _ls_divider(draw, end_y)
+    return end_y + 1
+
+
+def _ls_draw_grid_section(
+    draw: ImageDraw.ImageDraw,
+    y: int,
+    grid_range_low: float,
+    grid_range_high: float,
+    grid_count: int,
+    grid_spacing_pct: tuple[float, float],
+    trigger: float | None,
+    investment: float,
+) -> int:
+    """Draw grid range bar + zones/spacing + trigger + investment. Returns next Y."""
+    f = _status_fonts()
+    h = 100
+
+    # Section bg
+    draw.rectangle([(0, y), (_LS_W, y + h)], fill=L_SECTION)
+
+    # "GRID RANGE" label
+    _text(draw, _LS_PAD, y + 12, "GRID RANGE", f["r14"], L_TEXT_MUT)
+
+    # Range bar row
+    mf = f["mn16"]
+    zf = f["r16"]
+    content_y = y + 36
+
+    low_str = f"${_fp(grid_range_low)}"
+    high_str = f"${_fp(grid_range_high)}"
+    zones_str = f"{grid_count} zones \u00b7 {_format_spacing(grid_spacing_pct)}"
+
+    low_w = _tw(draw, low_str, mf)
+    high_w = _tw(draw, high_str, mf)
+    zones_w = _tw(draw, zones_str, zf)
+
+    BAR_GAP = 14
+    bar_x1 = _LS_PAD + low_w + BAR_GAP
+    bar_x2 = _LS_W - _LS_PAD - zones_w - BAR_GAP - high_w - BAR_GAP
+
+    _text(draw, _LS_PAD, content_y, low_str, mf, L_TEXT_SEC)
+    _text(draw, bar_x2 + BAR_GAP, content_y, high_str, mf, L_TEXT_SEC)
+
+    # Range bar
+    bb = _textsize(draw, low_str, mf)
+    bar_h = 8
+    bar_y = content_y + (bb[3] - bb[1]) // 2 - bar_h // 2
+    if bar_x2 > bar_x1 + 10:
+        draw.rounded_rectangle([(bar_x1, bar_y), (bar_x2, bar_y + bar_h)],
+                                radius=4, fill=L_BORDER)
+        draw.rounded_rectangle([(bar_x1 + 1, bar_y + 1), (bar_x2 - 1, bar_y + bar_h - 1)],
+                                radius=3, fill=L_ACCENT_DIM)
+
+    _text(draw, _LS_W - _LS_PAD - zones_w, content_y, zones_str, zf, L_TEXT_SEC)
+
+    # Bottom row: trigger + investment
+    bottom_y = content_y + 30
+    trigger_str = f"Trigger: ${_fp(trigger)}" if trigger is not None else "Trigger: \u2014"
+    invest_str = f"Investment: ${_fp(investment)}"
+    _text(draw, _LS_PAD, bottom_y, trigger_str, f["r14"], L_TEXT_SEC)
+    _text_right(draw, _LS_W - _LS_PAD, bottom_y, invest_str, f["r14"], L_TEXT_SEC)
+
+    end_y = y + h
+    _ls_divider(draw, end_y)
+    return end_y + 1
+
+
+def _ls_draw_footer(draw: ImageDraw.ImageDraw, y: int, state: str) -> int:
+    """Draw footer with status dot + state label + date. Returns next Y."""
+    f = _status_fonts()
+    h = 44
+
+    dot_color = L_GREEN if state.lower() == "running" else L_GOLD
+    dot_cx = _LS_PAD + 8
+    dot_cy = y + h // 2
+    draw.ellipse([(dot_cx - 5, dot_cy - 5), (dot_cx + 5, dot_cy + 5)], fill=dot_color)
+    _text_vcenter(draw, dot_cx + 14, y, h, state.upper(), f["r16"], dot_color)
+
+    # Date — right
+    ts = datetime.now().strftime("%b %d")
+    _text_vcenter_right(draw, _LS_W - _LS_PAD, y, h, ts, f["r14"], L_TEXT_MUT)
+
+    return y + h
+
+
+# ---------------------------------------------------------------------------
+# Light status card builders
+# ---------------------------------------------------------------------------
+
+def _render_spot_status_card(
+    label: str,
+    exchange: str,
+    network: str,
+    summary: "SpotGridSummary",
+    trigger: float | None,
+    investment: float,
+) -> Image.Image:
+    # Start with a tall canvas; we'll crop to actual content height
+    max_h = 900
+    img = Image.new("RGB", (_LS_W, max_h), L_BG)
+    draw = ImageDraw.Draw(img)
+
+    _ls_draw_background(img, draw, max_h)
+
+    y = 4  # after accent bar
+    y = _ls_draw_header(draw, y, label, exchange, network)
+    y = _ls_draw_symbol_row(draw, y, summary.symbol, "SPOT", summary.uptime)
+
+    net_profit = summary.total_profit
+    y = _ls_draw_pnl_section(
+        draw, y, net_profit, summary.matched_profit,
+        summary.total_fees, summary.roundtrips,
+    )
+
+    entry_str = f"${_fp(summary.initial_entry_price)}" if summary.initial_entry_price else "\u2014"
+    y = _ls_draw_metric_row(draw, y, [
+        ("Base Balance", f"{summary.base_balance:.4f}", L_TEXT_PRI),
+        ("Quote Balance", f"${_fp(summary.quote_balance)}", L_TEXT_SEC),
+        ("Entry Price", entry_str, L_TEXT_SEC),
+    ])
+
+    y = _ls_draw_grid_section(
+        draw, y, summary.grid_range_low, summary.grid_range_high,
+        summary.grid_count, summary.grid_spacing_pct, trigger, investment,
+    )
+
+    y = _ls_draw_footer(draw, y, summary.state)
+
+    # Crop to actual content
+    return img.crop((0, 0, _LS_W, y))
+
+
+def _render_perp_status_card(
+    label: str,
+    exchange: str,
+    network: str,
+    summary: "PerpGridSummary",
+    trigger: float | None,
+    investment: float,
+    is_isolated: bool,
+) -> Image.Image:
+    max_h = 900
+    img = Image.new("RGB", (_LS_W, max_h), L_BG)
+    draw = ImageDraw.Draw(img)
+
+    _ls_draw_background(img, draw, max_h)
+
+    y = 4
+    y = _ls_draw_header(draw, y, label, exchange, network)
+    y = _ls_draw_symbol_row(
+        draw, y, summary.symbol, "PERP", summary.uptime,
+        grid_bias=summary.grid_bias, leverage=summary.leverage,
+    )
+
+    net_profit = summary.matched_profit + summary.unrealized_pnl - summary.total_fees
+    y = _ls_draw_pnl_section(
+        draw, y, net_profit, summary.matched_profit,
+        summary.total_fees, summary.roundtrips,
+        unrealized_pnl=summary.unrealized_pnl,
+    )
+
+    side = summary.position_side.lower()
+    pos_color = L_GREEN if side == "long" else L_RED if side == "short" else L_TEXT_MUT
+    pos_text = f"{summary.position_side}  {abs(summary.position_size):.4f}"
+    margin_mode = "isolated" if is_isolated else "cross"
+
+    y = _ls_draw_metric_row(draw, y, [
+        ("Position", pos_text, pos_color),
+        ("Margin Balance", f"${_fp(summary.margin_balance)}", L_TEXT_SEC),
+        ("Avg Entry", f"${_fp(summary.avg_entry_price)}", L_TEXT_SEC),
+    ])
+
+    # Extra row: margin mode
+    f = _status_fonts()
+    mode_h = 36
+    _text_vcenter(draw, _LS_PAD, y, mode_h, f"Margin: {margin_mode}", f["r14"], L_TEXT_MUT)
+    _ls_divider(draw, y + mode_h)
+    y = y + mode_h + 1
+
+    y = _ls_draw_grid_section(
+        draw, y, summary.grid_range_low, summary.grid_range_high,
+        summary.grid_count, summary.grid_spacing_pct, trigger, investment,
+    )
+
+    y = _ls_draw_footer(draw, y, summary.state)
+
+    return img.crop((0, 0, _LS_W, y))
+
+
+def build_status_card(label: str, state: "BotState", theme: str = "light") -> io.BytesIO:
+    """Generate a PNG status card from bot state.
+
+    theme="light" uses the white/blue card; theme="dark" uses the legacy 800x480 card.
+    Returns BytesIO seeked to 0. Raises ValueError if state.summary is None.
+    """
+    from .models import PerpGridSummary, SpotGridSummary
+
+    if state.summary is None:
+        raise ValueError(f"No summary data available for {label!r}")
+
+    if theme == "dark":
+        return build_card_from_state(label, state)
+
+    exchange = state.info.exchange if state.info else "unknown"
+    network = state.info.network if state.info else "unknown"
+
+    trigger = state.config.trigger_price if state.config else None
+    investment = state.config.total_investment if state.config else 0.0
+
+    if isinstance(state.summary, SpotGridSummary):
+        img = _render_spot_status_card(
+            label, exchange, network, state.summary, trigger, investment,
+        )
+    elif isinstance(state.summary, PerpGridSummary):
+        is_isolated = state.config.is_isolated if state.config else False
+        img = _render_perp_status_card(
+            label, exchange, network, state.summary,
+            trigger, investment, is_isolated,
+        )
+    else:
+        raise ValueError(f"Unknown summary type for {label!r}: {type(state.summary)}")
 
     buf = io.BytesIO()
     img.save(buf, format="PNG", optimize=True)

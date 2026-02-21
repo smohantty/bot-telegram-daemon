@@ -25,6 +25,7 @@ reporting:
   periodic_interval_minutes: 60    # Send consolidated summary every N minutes (0 = disabled)
   error_cooldown_seconds: 60       # Min gap between repeated error alerts per bot
   startup_notification: true       # Send a message when the daemon starts
+  card_theme: "light"              # Card image theme: "dark", "light", or "text" (text-only, no images)
 
 # Connection settings
 connection:

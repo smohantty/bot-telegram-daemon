@@ -10,6 +10,8 @@ from unittest.mock import patch
 import pytest
 import yaml
 
+from pydantic import ValidationError
+
 from src.config import DaemonConfig, TelegramConfig, load_config
 
 
@@ -118,6 +120,39 @@ class TestConfigLoading:
         data = {"telegram": {"bot_token": "tok", "chat_id": "123"}}
         path = _write_config(data, tmp_path)
         with pytest.raises(Exception):
+            load_config(path)
+
+    def test_card_theme_default(self, tmp_path: Path) -> None:
+        """Omitted card_theme defaults to 'light'."""
+        data = {
+            "telegram": {"bot_token": "tok", "chat_id": "123"},
+            "bots": [{"label": "B", "url": "ws://localhost:9000"}],
+        }
+        path = _write_config(data, tmp_path)
+        config = load_config(path)
+        assert config.reporting.card_theme == "light"
+
+    def test_card_theme_valid_values(self, tmp_path: Path) -> None:
+        """All three valid card_theme values are accepted."""
+        for theme in ("dark", "light", "text"):
+            data = {
+                "telegram": {"bot_token": "tok", "chat_id": "123"},
+                "bots": [{"label": "B", "url": "ws://localhost:9000"}],
+                "reporting": {"card_theme": theme},
+            }
+            path = _write_config(data, tmp_path)
+            config = load_config(path)
+            assert config.reporting.card_theme == theme
+
+    def test_card_theme_invalid_raises(self, tmp_path: Path) -> None:
+        """Invalid card_theme value raises ValidationError."""
+        data = {
+            "telegram": {"bot_token": "tok", "chat_id": "123"},
+            "bots": [{"label": "B", "url": "ws://localhost:9000"}],
+            "reporting": {"card_theme": "neon"},
+        }
+        path = _write_config(data, tmp_path)
+        with pytest.raises(ValidationError):
             load_config(path)
 
 

@@ -14,7 +14,7 @@ from telegram import Update
 from telegram.constants import ParseMode
 from telegram.ext import Application, CommandHandler, ContextTypes
 
-from .card_renderer import build_card_from_state, build_periodic_card
+from .card_renderer import build_card_from_state, build_periodic_card, build_status_card
 from .config import TelegramConfig
 from .formatter import (
     format_bot_status,
@@ -35,8 +35,9 @@ MAX_MESSAGE_LENGTH = 4096
 class TelegramBot:
     """Telegram bot with command handlers and message sending capabilities."""
 
-    def __init__(self, config: TelegramConfig) -> None:
+    def __init__(self, config: TelegramConfig, card_theme: str = "light") -> None:
         self._chat_id = int(config.chat_id)
+        self._card_theme = card_theme
         self._monitor = None  # Set via set_monitor() to break circular dep
         self._app = Application.builder().token(config.bot_token).build()
         self._app.add_handler(CommandHandler("status", self._cmd_status))
@@ -68,31 +69,49 @@ class TelegramBot:
     async def _cmd_status(
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
     ) -> None:
-        """Handle /status — full detailed summary."""
+        """Handle /status — send a light-theme PNG status card per bot."""
         if not self._monitor or not update.message:
             return
 
         args = context.args or []
         states: dict[str, BotState] = self._monitor.get_all_states()
+        chat_id = update.message.chat_id
 
         if args:
             label = args[0]
             if label in states:
-                msg = format_bot_status(label, states[label])
+                await self._send_status_card(chat_id, label, states[label])
             else:
                 available = ", ".join(states.keys())
-                msg = f"unknown bot: {label}\navailable: {available}"
+                await self._send_safe(chat_id, f"unknown bot: {label}\navailable: {available}")
         else:
             if not states:
-                msg = "no bots configured"
+                await self._send_safe(chat_id, "no bots configured")
             else:
-                sections = [
-                    format_bot_status(lbl, st) for lbl, st in states.items()
-                ]
-                msg = "\n\n" + "\u2500" * 24 + "\n\n"
-                msg = msg.join(sections)
+                for lbl, st in states.items():
+                    await self._send_status_card(chat_id, lbl, st)
 
-        await self._send_safe(update.message.chat_id, msg)
+    async def _send_status_card(self, chat_id: int, label: str, state: "BotState") -> None:
+        """Send one bot's status as an image card with text fallback."""
+        if not state.connected:
+            await self._send_safe(chat_id, f"{label} \u2014 disconnected")
+            return
+
+        if state.summary is None:
+            await self._send_safe(chat_id, f"{label} \u2014 waiting for data")
+            return
+
+        if self._card_theme == "text":
+            await self._send_safe(chat_id, format_bot_status(label, state))
+            return
+
+        try:
+            image_buf = build_status_card(label, state, theme=self._card_theme)
+            await self._send_photo(chat_id, image_buf)
+        except Exception as e:
+            logger.warning("Status card render failed for %s: %s — falling back to text", label, e)
+            fallback = format_bot_status(label, state)
+            await self._send_safe(chat_id, fallback)
 
     async def _cmd_help(
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
@@ -144,8 +163,14 @@ class TelegramBot:
         if state.summary is None:
             return  # no data yet, skip
 
+        if self._card_theme == "text":
+            fallback = format_periodic_update(label, state)
+            if fallback:
+                await self._send_safe(self._chat_id, fallback)
+            return
+
         try:
-            image_buf = build_periodic_card(label, state)
+            image_buf = build_periodic_card(label, state, theme=self._card_theme)
             await self._send_photo(self._chat_id, image_buf)
         except Exception as e:
             logger.warning("Card render failed for %s: %s — falling back to text", label, e)

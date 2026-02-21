@@ -7,6 +7,7 @@ YAML file are used as fallback — env vars always take precedence.
 
 import os
 from pathlib import Path
+from typing import Literal
 
 import yaml
 from pydantic import BaseModel, field_validator, model_validator
@@ -61,6 +62,7 @@ class ReportingConfig(BaseModel):
     periodic_interval_minutes: int = 60
     error_cooldown_seconds: int = 60
     startup_notification: bool = True
+    card_theme: Literal["dark", "light", "text"] = "light"
 
 
 class ConnectionConfig(BaseModel):
