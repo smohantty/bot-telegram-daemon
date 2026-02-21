@@ -797,7 +797,7 @@ def build_periodic_card(label: str, state: "BotState") -> io.BytesIO:
         label=label,
         symbol=state.summary.symbol,
         strategy_type=stype,
-        total_profit=state.summary.total_profit,
+        total_profit=state.summary.matched_profit,
         roundtrips=state.summary.roundtrips,
         delta_roundtrips=delta_roundtrips,
         delta_profit=delta_profit,
