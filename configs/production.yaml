@@ -13,10 +13,11 @@ bots:
 
 # Reporting settings
 reporting:
-  periodic_interval_minutes: 1    # Send consolidated summary every N minutes (0 = disabled)
+  periodic_interval_minutes: 60    # Send consolidated summary every N minutes (0 = disabled)
   error_cooldown_seconds: 60       # Min gap between repeated error alerts per bot
   startup_notification: true       # Send a message when the daemon starts
-  card_theme: "dark"
+  card_theme: "light"
+
 # Connection settings
 connection:
   reconnect_delay_seconds: 5       # Initial reconnect delay
